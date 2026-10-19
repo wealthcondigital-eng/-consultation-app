@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The brand teal the Flutter splash opens on. Kept here so the window
+         the OS paints before the engine starts is already the right colour,
+         instead of a white flash cutting to teal a frame later. -->
+    <color name="brand_teal">#FF1B7B80</color>
+
+    <!-- What Android tints the notification's small icon and app name with.
+         Without it the tint is a system grey, which reads as a notification
+         from nothing in particular. The same teal as the launcher icon, so the
+         tray entry and the home screen are recognisably one app. -->
+    <color name="notification_accent">#FF1B7B80</color>
+</resources>

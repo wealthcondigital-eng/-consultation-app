@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "505105017093",
+    "project_id": "online-consultation-37554",
+    "storage_bucket": "online-consultation-37554.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:505105017093:android:1e8cbfc1cd4d9d00482f6c",
+        "android_client_info": {
+          "package_name": "com.teleconsultation.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBa6W02loiDeFSwzqh-wfyKcDQO8o0NcBM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:505105017093:android:282f87b67e675e15482f6c",
+        "android_client_info": {
+          "package_name": "consult.nesliferesearch.com"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBa6W02loiDeFSwzqh-wfyKcDQO8o0NcBM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

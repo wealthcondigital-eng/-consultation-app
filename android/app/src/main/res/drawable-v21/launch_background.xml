@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The window behind the app while the process starts. Matches the brand
+     gradient's first stop, so the launch reads as one surface from the OS
+     animation through to the Flutter splash. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/brand_teal" />
+</layer-list>

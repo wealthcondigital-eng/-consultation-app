@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The small icon on every notification this app shows.
+
+  Android does NOT draw this as a picture. It takes the alpha channel and
+  nothing else, paints every opaque pixel white (or the accent colour on some
+  surfaces), and throws the colour away. That is why `@mipmap/ic_launcher` must
+  not be used here: the launcher icon is a solid teal square, every pixel of it
+  is opaque, and the result is a featureless white blob in the status bar —
+  which is exactly what a notification from this app looked like.
+
+  So the shape has to live in the *transparency*. This is the brand mark
+  reduced to one silhouette: the speech bubble filled, the medical cross inside
+  it punched back out to nothing. At 24dp in a status bar that still reads as
+  "a consultation", which is the only job it has.
+
+  A vector rather than five PNGs. Small icons have accepted VectorDrawable
+  since API 21 and this app is minSdk 24, so one file covers every density and
+  there is no set of exports to keep in step with the logo.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+
+    <!--
+      One path, two subpaths, `evenOdd`. The bubble is drawn solid and the
+      cross is drawn inside it; even-odd makes the overlap cancel, so the cross
+      becomes a hole rather than an invisible shape painted the same white on
+      white. Drawing them as two separate <path> elements would lose the
+      knockout entirely — the second would just sit on top of the first.
+    -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M7,3 L17,3 A5,5 0 0 1 22,8 L22,12 A5,5 0 0 1 17,17 L9,17 L5,21 L5.6,17 A5,5 0 0 1 2,12 L2,8 A5,5 0 0 1 7,3 Z M10.75,5.75 L13.25,5.75 L13.25,8.75 L16.25,8.75 L16.25,11.25 L13.25,11.25 L13.25,14.25 L10.75,14.25 L10.75,11.25 L7.75,11.25 L7.75,8.75 L10.75,8.75 Z" />
+</vector>
