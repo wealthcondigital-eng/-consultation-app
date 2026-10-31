@@ -6,6 +6,7 @@ import '../responsive/app_sizing.dart';
 import '../theme/app_colors.dart';
 import '../theme/theme_controller.dart';
 import '../l10n/tr.dart';
+import 'app_button.dart';
 
 /// The profile row that picks light, dark or the phone's own setting.
 ///
@@ -33,9 +34,12 @@ class AppearanceRow extends StatelessWidget {
   }
 }
 
-/// System default, Light, Dark — applied the moment one is tapped, so the
-/// sheet itself previews the choice.
-class AppearanceSheet extends StatelessWidget {
+/// System default, Light, Dark — chosen in the sheet and applied on Done.
+///
+/// Not on tap: the whole app repainting under a finger that is still deciding
+/// read as a flash, and closing the sheet any other way keeps the theme the
+/// person already had.
+class AppearanceSheet extends StatefulWidget {
   const AppearanceSheet({super.key});
 
   static Future<void> show(BuildContext context) {
@@ -51,12 +55,26 @@ class AppearanceSheet extends StatelessWidget {
   }
 
   @override
+  State<AppearanceSheet> createState() => _AppearanceSheetState();
+}
+
+class _AppearanceSheetState extends State<AppearanceSheet> {
+  final ThemeController _theme = sl<ThemeController>();
+
+  /// What is ticked in the sheet, not yet applied.
+  late ThemeMode _pending = _theme.mode;
+
+  void _done() {
+    if (_pending != _theme.mode) _theme.setMode(_pending);
+    Navigator.of(context).pop();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final sizing = context.sizing;
-    final theme = sl<ThemeController>();
 
     return ListenableBuilder(
-      listenable: theme,
+      listenable: _theme,
       builder: (context, _) => AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         decoration: BoxDecoration(
@@ -98,11 +116,13 @@ class AppearanceSheet extends StatelessWidget {
                 for (final mode in ThemeMode.values) ...[
                   _ModeOption(
                     mode: mode,
-                    selected: theme.mode == mode,
-                    onTap: () => theme.setMode(mode),
+                    selected: _pending == mode,
+                    onTap: () => setState(() => _pending = mode),
                   ),
                   SizedBox(height: sizing.spacingXs),
                 ],
+                SizedBox(height: sizing.spacingSm),
+                AppButton.primary(label: 'Done', onPressed: _done),
               ],
             ),
           ),

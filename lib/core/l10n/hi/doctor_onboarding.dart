@@ -99,6 +99,10 @@ const Map<String, String> hiDoctorOnboarding = {
   // Specialties. Only the shown label is translated; the saved value stays
   // English. Degree abbreviations and place names are left as they are.
   'Internal Medicine': 'इंटरनल मेडिसिन',
+  'Stress Management': 'तनाव प्रबंधन',
+  'Search or type your own': 'खोजें या अपना लिखें',
+  'Add "{value}"': '"{value}" जोड़ें',
+  'Choose at least one language.': 'कम से कम एक भाषा चुनें।',
   'Cardiology': 'कार्डियोलॉजी (हृदय रोग)',
   'Paediatrics': 'पीडियाट्रिक्स (शिशु रोग)',
   'Dermatology': 'डर्मेटोलॉजी (त्वचा रोग)',

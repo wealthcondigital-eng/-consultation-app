@@ -12,6 +12,7 @@ import '../../../../core/widgets/responsive_page.dart';
 import '../../../anonymous/domain/entities/anonymous_session.dart';
 import '../../../consultation/domain/entities/consultation_mode.dart';
 import '../../../doctors/domain/entities/doctor.dart';
+import '../../../home/presentation/widgets/consult_consent_dialog.dart';
 import '../../domain/entities/payment_failure.dart';
 import '../../domain/entities/payment_method.dart';
 import '../controllers/payment_controller.dart';
@@ -109,6 +110,17 @@ class _PaymentScreenState extends State<PaymentScreen> {
     FocusScope.of(context).unfocus();
 
     final session = widget.args.anonymousSession;
+
+    // Every named consultation reaches its doctor through this button —
+    // from a doctor's profile, the list, "Consult again", or a booked slot —
+    // and every one is recorded, so every one asks first. Someone who agreed
+    // on the home card moments ago is not asked twice; an anonymous
+    // consultation agreed to its own terms and is never recorded.
+    if (session == null &&
+        !await ConsultConsentDialog.ensure(context, ConsultConsent.video)) {
+      return;
+    }
+    if (!mounted) return;
 
     // The booking is filed here, inside the same call: paying and holding the
     // slot either both happen or neither does. A patient who has paid and holds

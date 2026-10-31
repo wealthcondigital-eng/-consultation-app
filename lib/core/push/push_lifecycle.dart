@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../di/service_locator.dart';
+import '../recording/recording_upload_queue.dart';
 import '../session/auth_session.dart';
 import 'call_kit_bridge.dart';
 import 'push_service.dart';
@@ -47,5 +48,12 @@ class PushLifecycleObserver with WidgetsBindingObserver {
     // that does not render, and nothing here needs to finish before the app is
     // usable again.
     sl<PushService>().syncDevice();
+
+    // Back in the foreground is also when a recording that stalled on a
+    // dropped connection gets another go. One drain at a time; a no-op when
+    // nothing is pending.
+    if (sl.isRegistered<RecordingUploadQueue>()) {
+      sl<RecordingUploadQueue>().drain();
+    }
   }
 }

@@ -71,36 +71,107 @@ class Speciality {
 }
 
 enum SpecialitySymbol {
-  general,
-  dentistry,
-  cardiology,
-  paediatrics,
-  dermatology,
-  neurology,
+  general('general'),
+  dentistry('dentistry'),
+  cardiology('cardiology'),
+  paediatrics('paediatrics'),
+  dermatology('dermatology'),
+  neurology('neurology'),
 
-  /// Fallback for a speciality the app does not have a glyph for yet.
-  other;
+  /// Stress management, psychiatry, psychology.
+  mentalHealth('mental_health'),
 
-  /// The glyph for a specialty named by the backend.
+  /// Bones, joints, physiotherapy, sports injuries.
+  orthopaedics('orthopaedics'),
+  ophthalmology('ophthalmology'),
+  ent('ent'),
+
+  /// Lungs and breathing.
+  pulmonology('pulmonology'),
+
+  /// Stomach, gut and liver.
+  gastro('gastro'),
+  gynaecology('gynaecology'),
+
+  /// Kidneys and urinary tract.
+  kidney('kidney'),
+
+  /// Diabetes and hormones.
+  diabetes('diabetes'),
+
+  /// Fallback for a speciality the app does not have a picture for yet.
+  other('other');
+
+  const SpecialitySymbol(this.assetName);
+
+  /// The illustration's file in `assets/specialities/`, without `.svg`.
+  final String assetName;
+
+  /// The illustration for a specialty named by the backend.
   ///
   /// Matched on a substring rather than on equality, because the string is a
   /// doctor's own free-text specialty and reads `Paediatrics`, `Pediatric
   /// Surgery` or `Child Health` depending on who typed it. A miss is
-  /// [SpecialitySymbol.other], which draws a neutral glyph — a wrong icon is
+  /// [SpecialitySymbol.other], which draws a neutral picture — a wrong one is
   /// worse than a generic one.
+  ///
+  /// **Order matters**: `neurology` contains `uro`, `gastroenterology`
+  /// contains `ent`, so the longer names are tried first.
   static SpecialitySymbol forName(String name) {
     final needle = name.toLowerCase();
 
     bool has(String term) => needle.contains(term);
 
-    if (has('cardio') || has('heart')) return SpecialitySymbol.cardiology;
+    // Before neurology, whose `neuro` would otherwise claim neuropsychiatry.
+    if (has('stress') || has('psych') || has('mental') || has('counsel')) {
+      return SpecialitySymbol.mentalHealth;
+    }
+    if (has('cardio') || has('heart') || has('vascular')) {
+      return SpecialitySymbol.cardiology;
+    }
     if (has('dent') || has('oral')) return SpecialitySymbol.dentistry;
     if (has('paedia') || has('pedia') || has('child')) {
       return SpecialitySymbol.paediatrics;
     }
-    if (has('derma') || has('skin')) return SpecialitySymbol.dermatology;
+    if (has('derma') || has('skin') || has('tricho') || has('cosmet')) {
+      return SpecialitySymbol.dermatology;
+    }
     if (has('neuro') || has('nerve')) return SpecialitySymbol.neurology;
-    if (has('general') || has('physician') || has('medicine')) {
+    if (has('gastro') || has('hepat') || has('stomach') || has('digest')) {
+      return SpecialitySymbol.gastro;
+    }
+    // A word on its own: `ent` also sits inside "gastroenterology".
+    if (RegExp(r'\bent\b').hasMatch(needle) ||
+        has('otorhin') ||
+        has('ear, nose')) {
+      return SpecialitySymbol.ent;
+    }
+    if (has('ophthal') || has('eye') || has('optom')) {
+      return SpecialitySymbol.ophthalmology;
+    }
+    if (has('pulmo') || has('lung') || has('respir') || has('chest')) {
+      return SpecialitySymbol.pulmonology;
+    }
+    if (has('ortho') ||
+        has('bone') ||
+        has('physio') ||
+        has('rheuma') ||
+        has('sports')) {
+      return SpecialitySymbol.orthopaedics;
+    }
+    if (has('gyn') || has('obstet') || has('women')) {
+      return SpecialitySymbol.gynaecology;
+    }
+    if (has('nephro') || has('uro') || has('kidney')) {
+      return SpecialitySymbol.kidney;
+    }
+    if (has('diabet') || has('endocrin') || has('thyroid')) {
+      return SpecialitySymbol.diabetes;
+    }
+    if (has('general') ||
+        has('physician') ||
+        has('medicine') ||
+        has('family')) {
       return SpecialitySymbol.general;
     }
 

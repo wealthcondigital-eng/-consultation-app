@@ -1,3 +1,4 @@
+import 'package:consultation_app/features/home/presentation/widgets/consult_consent_dialog.dart';
 import 'package:consultation_app/app/app.dart';
 import 'package:consultation_app/app/router/app_routes.dart';
 import 'package:consultation_app/core/di/injector.dart';
@@ -44,7 +45,18 @@ Future<void> _openViaHome(WidgetTester tester, Size size) async {
   );
   await tester.pumpAndSettle();
 
-  await tester.tap(find.text('Consult Now'));
+  await tester.tap(find.text('Video consultation'));
+  await tester.pumpAndSettle();
+
+  // The consent popup comes first: read to the end, tick, then agree.
+  await tester.drag(
+    find.byKey(ConsultConsentDialog.scrollKey),
+    const Offset(0, -3000),
+  );
+  await tester.pumpAndSettle();
+  await tester.tap(find.textContaining('I have read and understood'));
+  await tester.pump();
+  await tester.tap(find.text('I agree'));
   await tester.pumpAndSettle();
 }
 
@@ -110,11 +122,13 @@ void main() {
       expect(find.byType(ConsultOptionCard), findsNWidgets(2));
     });
 
-    testWidgets('the home Consult Now card opens this screen', (tester) async {
+    testWidgets('the home Video consultation card opens this screen', (
+      tester,
+    ) async {
       await _openViaHome(tester, const Size(402, 874));
 
       expect(find.byType(ConsultOptionCard), findsNWidgets(2));
-      // The screen title reuses the card's label.
+      // The screen keeps its own title: it offers audio as well as video.
       expect(find.text('Consult Now'), findsWidgets);
     });
 

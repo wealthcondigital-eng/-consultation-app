@@ -157,20 +157,16 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     final entry = await _controller.destinationAfterSignIn(widget.args.role);
     if (!mounted) return;
 
-    // Two destinations end the session rather than open a screen: the number is
-    // registered under the other journey, or the server does not recognise the
-    // account at all. Both are handled here because both have the same answer —
-    // end the session and say why. A refused journey that leaves a token behind
-    // is one restart away from being the journey the app opens on.
-    if (entry.destination == StartDestination.roleConflict ||
-        entry.destination == StartDestination.sessionExpired) {
+    // The server does not recognise the account at all, so the session ends
+    // rather than opening a screen. A token left behind is one restart away
+    // from the app opening on an account that is gone.
+    if (entry.destination == StartDestination.sessionExpired) {
       await _controller.abandonSession();
       if (!mounted) return;
 
       AppSnackBar.error(
         context,
-        entry.notice ??
-            'This number is already registered under a different role.',
+        entry.notice ?? 'Your session has ended. Please sign in again.',
       );
 
       await Navigator.of(
@@ -203,10 +199,10 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         StartDestination.doctorApproved => AppRoutes.doctorApplicationApproved,
         StartDestination.doctorHome => AppRoutes.doctorHome,
         StartDestination.home => AppRoutes.home,
-        // The first two are unreachable — handled above — but the switch stays
-        // exhaustive so adding a destination is a compile error rather than a
-        // silent fall-through into the wrong app.
-        StartDestination.roleConflict ||
+        // The first two are unreachable — handled above, and only a cold
+        // launch abandons a registration — but the switch stays exhaustive so
+        // adding a destination is a compile error rather than a silent
+        // fall-through into the wrong app.
         StartDestination.sessionExpired ||
         StartDestination.registrationAbandoned ||
         StartDestination.completeProfile ||

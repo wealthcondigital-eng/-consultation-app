@@ -50,11 +50,6 @@ class Failure implements Exception {
     return text.contains('too many') || text.contains('rate limit');
   }
 
-  /// True when the number is already registered under the other role. The
-  /// landing flow turns this into an explanation naming the right way in,
-  /// rather than a generic refusal.
-  bool get isRoleConflict => code == 'role_conflict';
-
   /// The code this app normalises every 401 to, whichever wording the two API
   /// processes used — `session_missing` when no header was sent,
   /// `session_invalid` when the token named a user the server cannot find.

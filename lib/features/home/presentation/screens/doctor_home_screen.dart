@@ -288,8 +288,14 @@ class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
   @override
   Widget build(BuildContext context) {
     // Nothing behind this screen, so the back gesture would close the
-    // app outright — see [ExitConfirmation].
+    // app outright — see [ExitConfirmation]. From another tab, back lands on
+    // the dashboard first; only there does it ask to close.
     return ExitConfirmation(
+      onBack: () {
+        if (_tab == DoctorTab.home) return false;
+        _selectTab(DoctorTab.home);
+        return true;
+      },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: AppColors.overlayOnCanvas.copyWith(
           statusBarColor: Colors.transparent,

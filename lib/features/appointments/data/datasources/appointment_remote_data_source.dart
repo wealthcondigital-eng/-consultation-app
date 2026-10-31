@@ -62,7 +62,7 @@ class ApiAppointmentRemoteDataSource implements AppointmentRemoteDataSource {
     AppointmentAudience audience,
   ) {
     final requestedAt =
-        DateTime.tryParse(json['requestedAt'] as String? ?? '') ??
+        DateTime.tryParse(json['requestedAt'] as String? ?? '')?.toLocal() ??
         DateTime.now();
 
     // `scheduledAt` is the booked time; `startsAt` is what the doctor's
@@ -105,8 +105,8 @@ class ApiAppointmentRemoteDataSource implements AppointmentRemoteDataSource {
           : ConsultationMode.video,
       status: AppointmentStatus.from(json['status'] as String?),
       requestedAt: requestedAt,
-      startedAt: DateTime.tryParse(json['startedAt'] as String? ?? ''),
-      endedAt: DateTime.tryParse(json['endedAt'] as String? ?? ''),
+      startedAt: DateTime.tryParse(json['startedAt'] as String? ?? '')?.toLocal(),
+      endedAt: DateTime.tryParse(json['endedAt'] as String? ?? '')?.toLocal(),
       durationSeconds: (json['durationSeconds'] as num?)?.toInt() ?? 0,
       fee: (json['fee'] as num?)?.toInt(),
       rating: (json['rating'] as num?)?.toInt(),

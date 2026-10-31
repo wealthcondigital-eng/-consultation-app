@@ -1,4 +1,5 @@
 import '../../../../core/network/api_client.dart';
+import '../../../onboarding/domain/repositories/role_repository.dart';
 import '../../domain/entities/app_notification.dart';
 import 'notification_remote_data_source.dart';
 
@@ -7,9 +8,9 @@ import 'notification_remote_data_source.dart';
 /// **The contract**, served by `NotificationsController` in the NestJS API:
 ///
 /// ```
-/// GET /notifications            -> { "notifications": [ … ] }
+/// GET /notifications?role=      -> { "notifications": [ … ] }
 /// POST /notifications/{id}/read -> 204
-/// POST /notifications/read      -> 204        // all of them
+/// POST /notifications/read?role= -> 204       // all of that side's
 ///
 /// // One notification:
 /// {
@@ -46,13 +47,28 @@ import 'notification_remote_data_source.dart';
 /// its own notifications once this is live. Booking a slot is what creates
 /// them, and that happens server-side where the booking is stored.
 class ApiNotificationRemoteDataSource implements NotificationRemoteDataSource {
-  const ApiNotificationRemoteDataSource(this._client);
+  const ApiNotificationRemoteDataSource(this._client, this._roles);
 
   final ApiClient _client;
 
+  /// The side the app is being used as. One account can be a patient and a
+  /// doctor, and each side's bell shows only its own rows.
+  final RoleRepository _roles;
+
+  /// `?role=patient|doctor`, or nothing when no side is stored — the server
+  /// then answers with both, as it did before the filter existed.
+  Future<String> _roleQuery() async {
+    try {
+      final role = await _roles.readSelectedRole();
+      return role == null ? '' : '?role=${role.key}';
+    } catch (_) {
+      return '';
+    }
+  }
+
   @override
   Future<List<AppNotification>> fetch() async {
-    final body = await _client.get('/notifications');
+    final body = await _client.get('/notifications${await _roleQuery()}');
     final rows = body['notifications'];
 
     if (rows is! List) return const [];
@@ -65,7 +81,8 @@ class ApiNotificationRemoteDataSource implements NotificationRemoteDataSource {
   Future<void> markRead(String id) => _client.post('/notifications/$id/read');
 
   @override
-  Future<void> markAllRead() => _client.post('/notifications/read');
+  Future<void> markAllRead() async =>
+      _client.post('/notifications/read${await _roleQuery()}');
 
   /// Nothing to do: the server writes these when the booking is stored. Kept
   /// on the interface so the in-memory stand-in can behave as if it were a
@@ -77,7 +94,7 @@ class ApiNotificationRemoteDataSource implements NotificationRemoteDataSource {
     if (row is! Map) return null;
 
     final id = row['id'];
-    final createdAt = DateTime.tryParse(row['createdAt'] as String? ?? '');
+    final createdAt = DateTime.tryParse(row['createdAt'] as String? ?? '')?.toLocal();
     if (id is! String || createdAt == null) return null;
 
     return AppNotification(

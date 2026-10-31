@@ -59,7 +59,16 @@ class AppRoutes {
   static const String doctorMatching = '/consult/matching';
   static const String consultationFeedback = '/consult/feedback';
   static const String anonymousBooking = '/consult/anonymous';
+
+  /// The patient–doctor chat that holds only their call recordings. Takes
+  /// `RecordingsChatArgs`.
   static const String chat = '/chat';
+
+  /// Every recorded consultation, by doctor (or by patient, for a doctor).
+  static const String recordings = '/recordings';
+
+  /// Plays one call recording. Takes `RecordingPlayerArgs`.
+  static const String recordingPlayer = '/recordings/play';
   static const String call = '/call';
 
   /// The doctor's own profile and practice settings.

@@ -246,7 +246,9 @@ class ApiProfileRemoteDataSource implements ProfileRemoteDataSource {
       fullName: json['full_name'] as String? ?? '',
       email: json['email'] as String? ?? '',
       phoneNumber: _formatPhone(json['phone'] as String?),
-      dateOfBirth: dateOfBirth == null ? null : DateTime.tryParse(dateOfBirth),
+      dateOfBirth: dateOfBirth == null
+          ? null
+          : DateTime.tryParse(dateOfBirth)?.toLocal(),
       gender: Gender.fromKey(json['gender'] as String?),
       bloodGroup: BloodGroup.fromKey(json['blood_group'] as String?),
       // A path on the API — `/patients/me/photo` — not a public URL. See
@@ -269,7 +271,9 @@ class ApiProfileRemoteDataSource implements ProfileRemoteDataSource {
       allergies: _stringsOf(value['allergies']),
       surgeries: _stringsOf(value['surgeries']),
       notes: value['notes'] as String?,
-      lastUpdated: updatedAt == null ? null : DateTime.tryParse(updatedAt),
+      lastUpdated: updatedAt == null
+          ? null
+          : DateTime.tryParse(updatedAt)?.toLocal(),
     );
   }
 

@@ -52,7 +52,7 @@ class AppointmentPush {
     final body = (data['body'] as String?)?.trim() ?? '';
     if (title.isEmpty && body.isEmpty) return null;
 
-    final startsAt = DateTime.tryParse(data['startsAt'] as String? ?? '');
+    final startsAt = DateTime.tryParse(data['startsAt'] as String? ?? '')?.toLocal();
     final notificationId = (data['notificationId'] as String?)?.trim();
 
     return AppointmentPush(

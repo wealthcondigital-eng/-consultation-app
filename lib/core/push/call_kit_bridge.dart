@@ -164,7 +164,7 @@ class CallKitBridge {
         await prefs.remove(_acceptedKey);
 
         final note = jsonDecode(raw) as Map<String, dynamic>;
-        final at = DateTime.tryParse(note['at'] as String? ?? '');
+        final at = DateTime.tryParse(note['at'] as String? ?? '')?.toLocal();
         final id = note['consultationId'] as String?;
 
         if (id != null &&

@@ -89,6 +89,29 @@ class ApiClient {
     () => _http.put(_uri(path), headers: _headers(), body: jsonEncode(body)),
   );
 
+  /// Sends [bytes] as the raw body — one chunk of a recording upload.
+  ///
+  /// Not JSON and not multipart: the server writes the body straight to disk
+  /// at the index in [path]. The timeout is far longer than [timeout], because
+  /// a 4 MB chunk on a patchy mobile uplink takes far longer than a JSON
+  /// request does, and a chunk that times out half-sent is a chunk sent twice.
+  Future<Map<String, Object?>> putBytes(
+    String path,
+    Uint8List bytes, {
+    Duration timeout = const Duration(minutes: 2),
+  }) => _send(
+    'PUT $path',
+    () => _http.put(
+      _uri(path),
+      headers: {
+        ..._headers(json: false),
+        'content-type': 'application/octet-stream',
+      },
+      body: bytes,
+    ),
+    timeout: timeout,
+  );
+
   Future<Map<String, Object?>> delete(String path) => _send(
     'DELETE $path',
     () => _http.delete(_uri(path), headers: _headers()),
@@ -208,11 +231,12 @@ class ApiClient {
     String label,
     Future<http.Response> Function() request, {
     bool signalsExpiry = true,
+    Duration? timeout,
   }) async {
     final http.Response response;
 
     try {
-      response = await request().timeout(timeout);
+      response = await request().timeout(timeout ?? ApiClient.timeout);
       // Whatever it answered, something answered.
       _connectivity.reportReachable();
     } on TimeoutException {

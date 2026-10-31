@@ -47,6 +47,11 @@ class MainActivity : FlutterActivity() {
 
         appUpdate = AppUpdateBridge(this, flutterEngine.dartExecutor.binaryMessenger)
 
+        // Mixes and shrinks a recorded consultation before it is uploaded.
+        // Holds the application context, not this activity: an export can
+        // outlive the screen that started it.
+        RecordingComposer(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+
         // What the call needs from the phone that no plugin in the app offers:
         // staying alive behind the lock screen, and the settings that decide
         // whether a closed app can ring at all. See `lib/core/device/call_device.dart`.

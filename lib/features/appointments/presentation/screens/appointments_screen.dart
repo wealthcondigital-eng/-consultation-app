@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../app/router/app_routes.dart';
+import '../../../recordings/presentation/screens/recordings_chat_screen.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/format/app_date_format.dart';
@@ -300,7 +301,7 @@ class _Body extends StatelessWidget {
             for (final appointment in group.appointments) ...[
               if (appointment != group.appointments.first)
                 SizedBox(height: sizing.spacingSm),
-              _card(appointment),
+              _card(context, appointment),
             ],
           ],
         ],
@@ -308,13 +309,14 @@ class _Body extends StatelessWidget {
     );
   }
 
-  Widget _card(Appointment appointment) {
+  Widget _card(BuildContext context, Appointment appointment) {
     final onRejoin = this.onRejoin;
 
     return AppointmentCard(
       appointment: appointment,
       onRejoin: onRejoin == null ? null : () => onRejoin(appointment),
       onViewReceipt: () => onViewReceipt(appointment),
+      onOpenChat: () => openRecordingsChat(context, appointment),
     );
   }
 }

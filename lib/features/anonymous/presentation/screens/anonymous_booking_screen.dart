@@ -186,7 +186,8 @@ class _AnonymousBookingScreenState extends State<AnonymousBookingScreen> {
                             'management...',
                         controller: _concernController,
                         enabled: true,
-                        maxLength: 500,
+                        // No limit or counter: a patient describing something
+                        // private should not be made to cut it short.
                         errorText: _controller.concernError,
                         onChanged: _controller.changeConcern,
                       ),

@@ -88,6 +88,14 @@ Future<void> _uploadCertificate(WidgetTester tester) async {
 ///
 /// By position: the step lays its fields out in one column, in the order the
 /// design shows them, and the optional UPI ID at the end is left blank.
+/// Ticks one language. A certificate cannot say what a doctor speaks, so no
+/// scan fills it, and the details step will not move on without one.
+Future<void> _pickLanguage(WidgetTester tester) async {
+  await _scrollTo(tester, find.text('English'));
+  await tester.tap(find.text('English'));
+  await _settle(tester);
+}
+
 Future<void> _fillBankDetails(WidgetTester tester) async {
   const values = [
     'Chase Bank',
@@ -224,6 +232,7 @@ void main() {
         await tester.pump();
       }
 
+      await _pickLanguage(tester);
       await _scrollTo(tester, find.text('Continue to Bank Details'));
       await tester.tap(find.text('Continue to Bank Details'));
       await _settle(tester);
@@ -276,6 +285,7 @@ void main() {
       await _openSetup(tester, const Size(402, 874));
 
       await _uploadCertificate(tester);
+      await _pickLanguage(tester);
       await _scrollTo(tester, find.text('Continue to Bank Details'));
       await tester.tap(find.text('Continue to Bank Details'));
       await _settle(tester);
@@ -332,6 +342,7 @@ void main() {
       await _openSetup(tester, const Size(402, 874));
 
       await _uploadCertificate(tester);
+      await _pickLanguage(tester);
       await _scrollTo(tester, find.text('Continue to Bank Details'));
       await tester.tap(find.text('Continue to Bank Details'));
       await _settle(tester);
@@ -351,6 +362,7 @@ void main() {
       await _openSetup(tester, const Size(402, 874));
 
       await _uploadCertificate(tester);
+      await _pickLanguage(tester);
       await _scrollTo(tester, find.text('Continue to Bank Details'));
       await tester.tap(find.text('Continue to Bank Details'));
       await _settle(tester);

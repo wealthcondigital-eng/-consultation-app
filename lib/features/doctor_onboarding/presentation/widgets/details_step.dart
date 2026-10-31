@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_dropdown_field.dart';
 import '../../../../core/widgets/app_select_field.dart';
 import '../../../../core/widgets/app_text_field.dart';
+import '../../../doctor_practice/presentation/widgets/language_picker.dart';
 import '../../domain/entities/doctor_credentials.dart';
 import '../controllers/doctor_setup_controller.dart';
 import 'onboarding_banner.dart';
@@ -90,12 +91,16 @@ class DetailsStep extends StatelessWidget {
           ),
         ),
         SizedBox(height: sizing.spacingLg),
-        AppDropdownField<String>(
+        // A searchable sheet rather than a dropdown: the list is long, and no
+        // list covers every specialty, so a doctor can type their own.
+        AppSelectField<String>(
           label: 'Specialty',
           hint: 'Choose your specialty',
           value: credentials.specialty,
-          items: options.specialities,
-          labelOf: (specialty) => specialty,
+          options: {
+            for (final specialty in options.specialities) specialty: specialty,
+          },
+          customValue: _titleCase,
           errorText: showErrors && credentials.specialty == null
               ? 'Choose your specialty.'
               : null,
@@ -103,6 +108,19 @@ class DetailsStep extends StatelessWidget {
             (current) => current.copyWith(specialty: specialty),
           ),
         ),
+        SizedBox(height: sizing.spacingLg),
+        LanguagePicker(
+          selected: credentials.languages,
+          onToggle: (language) => controller.changeCredentials(
+            (current) => current.copyWith(
+              languages: _toggled(current.languages, language),
+            ),
+          ),
+        ),
+        if (showErrors && credentials.languages.isEmpty) ...[
+          SizedBox(height: sizing.spacingXs),
+          Text(tr('Choose at least one language.'), style: sizing.text.error),
+        ],
         SizedBox(height: sizing.spacingLg),
         _StateAndCity(controller: controller),
         SizedBox(height: sizing.spacingLg),
@@ -124,6 +142,30 @@ class DetailsStep extends StatelessWidget {
     );
   }
 }
+
+/// [languages] with [language] added, or removed if it was there.
+List<String> _toggled(List<String> languages, String language) {
+  final lower = language.toLowerCase();
+  final has = languages.any((entry) => entry.toLowerCase() == lower);
+
+  return has
+      ? [
+          for (final entry in languages)
+            if (entry.toLowerCase() != lower) entry,
+        ]
+      : [...languages, language];
+}
+
+/// `child psychiatry` → `Child Psychiatry`, so a typed specialty reads like
+/// the listed ones on a patient's screen. Only first letters change, so an
+/// acronym like `ENT` survives.
+String _titleCase(String typed) => typed
+    .trim()
+    .split(RegExp(r'\s+'))
+    .map(
+      (word) => word.isEmpty ? word : word[0].toUpperCase() + word.substring(1),
+    )
+    .join(' ');
 
 /// State and city sit side by side, and stack when the screen is too narrow
 /// for two dropdowns to stay legible.

@@ -87,4 +87,12 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
     // Google Play in-app updates, called from AppUpdateBridge.kt.
     implementation("com.google.android.play:app-update:2.1.0")
+    // Media3 Transformer, for RecordingComposer.kt: mixes the two halves of a
+    // recorded consultation and shrinks them on the phone before upload. Kept
+    // at the version video_player_android already pulls in, so the app ships
+    // one media3-common rather than two that disagree.
+    val media3Version = "1.9.2"
+    implementation("androidx.media3:media3-transformer:$media3Version")
+    implementation("androidx.media3:media3-effect:$media3Version")
+    implementation("androidx.media3:media3-common:$media3Version")
 }

@@ -31,10 +31,34 @@ enum AppUpdatePhase {
 /// restarts itself. An update marked high-priority in the Play Console
 /// (priority 4 or 5) is [isRequired]: its banner cannot be dismissed.
 class AppUpdateController extends ChangeNotifier {
-  AppUpdateController({bool? supported})
+  AppUpdateController({bool? supported, this.latestRelease})
     : _supported =
           supported ??
           (!kIsWeb && defaultTargetPlatform == TargetPlatform.android);
+
+  /// Reads `GET /app/latest` — the version name and Play's "What's new" for
+  /// the newest release — so the popup can say which version it is offering.
+  /// Optional: without it, or when it fails, the popup reads generically.
+  final Future<Map<String, Object?>?> Function()? latestRelease;
+
+  /// `1.0.17`, when the server knows the release Play is offering.
+  String? _versionName;
+  String? get versionName => _versionName;
+
+  /// Play's "What's new", one entry per line. Empty when none was written.
+  List<String> _releaseNotes = const [];
+  List<String> get releaseNotes => _releaseNotes;
+
+  /// The version code Play says is waiting. The popup is shown once per
+  /// version, not once per launch, so a newer release still gets its popup.
+  int? _availableVersionCode;
+
+  DateTime? _checkedAt;
+
+  /// How long a check stays good. Coming back to the app after this asks Play
+  /// again, so a phone that keeps the app open for days still hears about a
+  /// release.
+  static const Duration _recheckAfter = Duration(hours: 1);
 
   static const _methods = MethodChannel('consult/app_update');
   static const _events = EventChannel('consult/app_update/events');
@@ -64,21 +88,57 @@ class AppUpdateController extends ChangeNotifier {
   /// Whether there is an update to talk about at all.
   bool get isVisible => _phase != AppUpdatePhase.none;
 
-  bool _prompted = false;
+  int? _promptedFor;
+  bool _promptedUnknown = false;
 
-  /// Claims the once-per-launch sheet. True the first time only.
+  /// Claims the popup for the version on offer. True once per version.
   bool claimPrompt() {
-    if (_prompted) return false;
-    _prompted = true;
+    final code = _availableVersionCode;
+    if (code == null) {
+      if (_promptedUnknown) return false;
+      _promptedUnknown = true;
+      return true;
+    }
+    if (_promptedFor == code) return false;
+    _promptedFor = code;
     return true;
   }
 
   bool _checked = false;
 
+  /// Asks Play again: on coming back to the app once the last check is
+  /// stale, or straight away when [force] — an update notification arrived
+  /// or was tapped, which also brings the popup back even after Later.
+  Future<void> recheck({bool force = false}) async {
+    if (!_supported) return;
+
+    final stale =
+        _checkedAt == null ||
+        DateTime.now().difference(_checkedAt!) > _recheckAfter;
+    if (!force && !stale) return;
+
+    // Mid-download there is nothing to re-ask; the bar is already moving.
+    if (_isBusy) return;
+
+    if (force) {
+      _dismissed = false;
+      _promptedFor = null;
+      _promptedUnknown = false;
+    }
+    _checked = false;
+    await check();
+  }
+
+  bool get _isBusy =>
+      _phase == AppUpdatePhase.starting ||
+      _phase == AppUpdatePhase.downloading ||
+      _phase == AppUpdatePhase.installing;
+
   /// Asks Play once per launch. Safe to call from every home screen.
   Future<void> check() async {
     if (!_supported || _checked) return;
     _checked = true;
+    _checkedAt = DateTime.now();
 
     _subscription ??= _events.receiveBroadcastStream().listen(
       _onEvent,
@@ -95,6 +155,8 @@ class AppUpdateController extends ChangeNotifier {
 
       final priority = (info['priority'] as num?)?.toInt() ?? 0;
       _isRequired = priority >= 4;
+      _availableVersionCode = (info['availableVersionCode'] as num?)?.toInt();
+      await _readRelease();
       _phase = info['downloaded'] == true
           ? AppUpdatePhase.installing
           : AppUpdatePhase.available;
@@ -105,6 +167,39 @@ class AppUpdateController extends ChangeNotifier {
       // Widget tests and any platform without the bridge.
     } on PlatformException {
       // Play unavailable — nothing to offer.
+    }
+  }
+
+  /// Fills [versionName] and [releaseNotes] from the server, but only when
+  /// they describe the build Play is actually offering — notes for a
+  /// different version would promise changes this update does not have.
+  Future<void> _readRelease() async {
+    final read = latestRelease;
+    if (read == null) return;
+
+    try {
+      final release = (await read())?['release'];
+      if (release is! Map) return;
+
+      final code = (release['versionCode'] as num?)?.toInt();
+      if (_availableVersionCode != null && code != _availableVersionCode) {
+        return;
+      }
+
+      final name = release['versionName'];
+      _versionName = name is String && name.isNotEmpty ? name : null;
+
+      final notes = release['releaseNotes'];
+      _releaseNotes = notes is String
+          ? [
+              for (final line in notes.split('\n'))
+                if (line.replaceFirst(RegExp(r'^[\s•*\-–]+'), '').trim()
+                    case final text when text.isNotEmpty)
+                  text,
+            ]
+          : const [];
+    } catch (_) {
+      // Offline or an older server: the popup reads generically instead.
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:consultation_app/core/di/injector.dart';
 import 'package:consultation_app/core/di/service_locator.dart';
 import 'package:consultation_app/features/doctors/domain/entities/doctor.dart';
 import 'package:consultation_app/features/doctors/presentation/screens/doctor_list_screen.dart';
+import 'package:consultation_app/features/home/presentation/widgets/consult_consent_dialog.dart';
 import 'package:consultation_app/features/payment/data/datasources/payment_remote_data_source.dart';
 import 'package:consultation_app/features/payment/domain/entities/payment_method.dart';
 import 'package:consultation_app/features/payment/presentation/screens/payment_screen.dart';
@@ -56,6 +57,8 @@ void main() {
   setUp(() {
     sl.reset();
     configureDependencies();
+    // Each test starts from a patient who has not agreed to recording yet.
+    ConsultConsentDialog.resetConsents();
   });
 
   group('PaymentScreen', () {
@@ -199,8 +202,22 @@ void main() {
       await tester.enterText(_upiField(), 'amit.verma@okaxis');
       await tester.pump();
 
+      // A named consultation is recorded, so Pay asks for consent first and
+      // charges nothing until it is given.
       await tester.tap(_payButton());
+      await tester.pumpAndSettle();
+      expect(find.byType(ConsultConsentDialog), findsOneWidget);
+
+      await tester.drag(
+        find.byKey(ConsultConsentDialog.scrollKey),
+        const Offset(0, -3000),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.textContaining('I have read and understood'));
       await tester.pump();
+      await tester.tap(find.text('I agree'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
       // Bounded pumps: the confirmation screen starts its own auto-advance.

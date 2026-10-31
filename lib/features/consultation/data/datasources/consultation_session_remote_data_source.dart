@@ -219,6 +219,9 @@ class ApiConsultationSessionRemoteDataSource
         'doctorId': ?doctorId,
         if (isAnonymous) 'isAnonymous': true,
         if (isAnonymous && alias != null) 'alias': alias,
+        // The patient agreed to recording in the popup before this request.
+        // Never sent for an anonymous consultation, which is never recorded.
+        if (!isAnonymous) 'recordingConsent': true,
         if (concern != null && concern.trim().isNotEmpty)
           'concern': concern.trim(),
       },
@@ -252,6 +255,9 @@ class ApiConsultationSessionRemoteDataSource
             'concern': concern.trim(),
           if (isAnonymous) 'isAnonymous': true,
           if (isAnonymous && alias != null) 'alias': alias,
+          // As for an instant request: agreed before booking, and never on an
+          // anonymous consultation.
+          if (!isAnonymous) 'recordingConsent': true,
         },
       );
     } on Failure catch (failure) {
@@ -424,6 +430,10 @@ class ApiConsultationSessionRemoteDataSource
       isCaller: value['isCaller'] == true,
       patientName: value['patientName'] as String? ?? 'Patient',
       isAnonymous: value['isAnonymous'] == true,
+      // Belt and braces: an anonymous consultation is never recorded, whatever
+      // the record says.
+      recordingConsent:
+          value['recordingConsent'] == true && value['isAnonymous'] != true,
       doctor: _doctorFrom(value['doctor']),
       fee: (value['fee'] as num?)?.toInt(),
       // Back to local time. It travels as UTC, and every screen that shows it —
@@ -464,6 +474,7 @@ class ApiConsultationSessionRemoteDataSource
       audioConsultationFee: audio,
       isVerified: value['isVerified'] == true,
       isAvailableNow: value['isAvailableNow'] == true,
+      photoUrl: value['photoUrl'] as String?,
     );
   }
 }

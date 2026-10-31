@@ -70,6 +70,12 @@ class CallRepositoryImpl implements CallRepository {
   }
 
   @override
+  MediaStreamTrack? get remoteVideoTrack => _mediaService.remoteVideoTrack;
+
+  @override
+  Future<bool> remoteAudioFlowing() => _mediaService.remoteAudioFlowing();
+
+  @override
   Future<void> disposeRenderers(
     RTCVideoRenderer localRenderer,
     RTCVideoRenderer remoteRenderer,

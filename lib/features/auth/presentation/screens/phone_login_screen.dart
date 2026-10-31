@@ -266,9 +266,8 @@ class _LoginForm extends StatelessWidget {
       ),
       children: [
         // Which journey this sign-in is for. The landing screen already asked,
-        // and a number registered under the other role is refused after the
-        // code — so saying it here is the last point at which going back costs
-        // nothing.
+        // and it decides which side opens after the code — so saying it here
+        // is the last point at which going back costs nothing.
         if (role case final role?) ...[
           Align(
             alignment: Alignment.centerLeft,
@@ -319,8 +318,9 @@ class _AuthBrandMark extends StatelessWidget {
 /// landing screen.
 ///
 /// Not a control. Changing it means going back one screen, which is a tap away
-/// and unambiguous; a second place to switch roles would leave two answers to
-/// the same question on two screens.
+/// and unambiguous; a second place to pick a role before sign-in would leave
+/// two answers to the same question on two screens. Once signed in, the switch
+/// on either profile screen moves between the two sides.
 class _RoleChip extends StatelessWidget {
   const _RoleChip({required this.role});
 

@@ -1,23 +1,41 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../../core/responsive/app_sizing.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../doctors/domain/entities/speciality.dart';
 import '../../../../core/l10n/tr.dart';
 
-/// Maps a domain symbol to its glyph, so the entity stays free of Flutter
-/// types and an unknown speciality still renders.
-IconData iconForSpeciality(SpecialitySymbol symbol) => switch (symbol) {
-  SpecialitySymbol.general => Icons.person_search_rounded,
-  SpecialitySymbol.dentistry => Icons.medication_liquid_rounded,
-  SpecialitySymbol.cardiology => Icons.favorite_rounded,
-  SpecialitySymbol.paediatrics => Icons.child_care_rounded,
-  SpecialitySymbol.dermatology => Icons.spa_rounded,
-  SpecialitySymbol.neurology => Icons.psychology_rounded,
-  SpecialitySymbol.other => Icons.local_hospital_rounded,
-};
+/// A speciality's picture — a heart for cardiology, a tooth for dentistry —
+/// so a patient finds theirs by looking rather than reading.
+///
+/// Drawn from `assets/specialities/`: one SVG per [SpecialitySymbol], each on
+/// its own soft colour, so they stay sharp at any size and need no network.
+/// An unknown speciality gets the neutral medical one.
+class SpecialityArt extends StatelessWidget {
+  const SpecialityArt({
+    super.key,
+    required this.symbol,
+    required this.size,
+    this.semanticLabel,
+  });
 
-/// One speciality in the grid: a glyph circle above its name.
+  final SpecialitySymbol symbol;
+  final double size;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return SvgPicture.asset(
+      'assets/specialities/${symbol.assetName}.svg',
+      width: size,
+      height: size,
+      semanticsLabel: semanticLabel,
+    );
+  }
+}
+
+/// One speciality in the grid: its picture above its name.
 class SpecialityTile extends StatelessWidget {
   const SpecialityTile({
     super.key,
@@ -48,26 +66,18 @@ class SpecialityTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: sizing.avatarSize,
-                height: sizing.avatarSize,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceMuted,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  iconForSpeciality(speciality.symbol),
-                  size: sizing.iconLg,
-                  color: AppColors.primary,
-                ),
+              SpecialityArt(
+                symbol: speciality.symbol,
+                size: sizing.r(52),
+                semanticLabel: tr(speciality.name),
               ),
               SizedBox(height: sizing.spacingXs),
               Text(
                 tr(speciality.name),
                 style: sizing.text.tileLabel,
                 textAlign: TextAlign.center,
-                maxLines: 1,
+                // Two lines, so a long name wraps instead of being cut.
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
             ],

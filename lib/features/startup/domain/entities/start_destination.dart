@@ -1,5 +1,4 @@
 import '../../../doctor_onboarding/domain/entities/doctor_application.dart';
-import '../../../../core/l10n/tr.dart';
 
 /// Where the app should open, decided from the restored session.
 enum StartDestination {
@@ -69,21 +68,10 @@ enum StartDestination {
   /// be sure the person holding the phone is still the person who verified it.
   ///
   /// Note that a *filed* registration is not this: a doctor waiting on review,
-  /// or one correcting a rejected application, has an account and resumes.
+  /// or one correcting a rejected application, has an account and resumes. Nor
+  /// is someone with a usable profile on the other side — a patient who began
+  /// registering as a doctor reopens on their patient dashboard instead.
   registrationAbandoned,
-
-  /// This number is already registered under the **other** role.
-  ///
-  /// A phone number is one person, and one person is either consulting or being
-  /// consulted. Without this the two journeys could both be entered from the
-  /// same number: a patient who happened to tap Doctor on the landing screen
-  /// was walked into doctor registration, and a doctor who tapped Patient was
-  /// handed the patient dashboard — two half-built accounts on one identity,
-  /// and a consultation record with nobody real on one end of it.
-  ///
-  /// The session is ended and [StartEntry.notice] is what the landing screen
-  /// says.
-  roleConflict,
 }
 
 /// Where to open, and what that screen needs to know.
@@ -99,29 +87,12 @@ class StartEntry {
   /// Set for the doctor destinations, null everywhere else.
   final DoctorApplication? application;
 
-  /// Set for the two destinations that end the session — [
-  /// StartDestination.roleConflict] and [StartDestination.sessionExpired] —
-  /// and null everywhere else. What the landing screen tells the user about
-  /// why they are back at the start.
+  /// Set for the destinations that end the session —
+  /// [StartDestination.sessionExpired] and
+  /// [StartDestination.registrationAbandoned] — and for an unconfirmed
+  /// [StartDestination.landing]; null everywhere else. What the landing screen
+  /// tells the user about why they are back at the start.
   final String? notice;
-
-  /// The conflict copy for someone who chose [chosen] but whose number is
-  /// already registered as the other role.
-  ///
-  /// Names the way in rather than only the refusal. "Already registered" with
-  /// no next step is a dead end, and the next step is one tap away on the
-  /// screen this message is shown on.
-  factory StartEntry.conflict({required String registeredAs}) {
-    return StartEntry(
-      StartDestination.roleConflict,
-      notice: tr(
-        'This number is already registered as a {role}. '
-        'Go back and continue as {role}, '
-        'or use a different number.',
-        {'role': tr(registeredAs)},
-      ),
-    );
-  }
 
   /// Registration was started and never finished, so the session goes with it.
   ///

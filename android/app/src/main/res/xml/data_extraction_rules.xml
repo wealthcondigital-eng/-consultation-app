@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup and device-transfer rules.
+
+  Consultation recordings stay on this phone only: they are medical, they are
+  large, and the server already holds a copy the app can stream. Without this,
+  Android's automatic backup would copy them into the user's Google Drive
+  backup and onto any new phone they set up.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_flutter/recordings/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="app_flutter/recordings/" />
+    </device-transfer>
+</data-extraction-rules>

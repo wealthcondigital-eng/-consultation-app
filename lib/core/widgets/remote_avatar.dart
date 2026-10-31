@@ -160,6 +160,12 @@ class _Initials extends StatelessWidget {
   Widget build(BuildContext context) {
     final sizing = context.sizing;
 
+    // `?` is what callers pass for an anonymous patient or a missing name. A
+    // question mark in a circle reads as an error, so it becomes a person.
+    if (initials.trim().isEmpty || initials == '?') {
+      return Icon(Icons.person_rounded, size: size * 0.55, color: color);
+    }
+
     return Text(
       initials,
       style: sizing.text.headline.copyWith(

@@ -10,6 +10,7 @@ enum DoctorCredentialField {
   state,
   city,
   yearsOfExperience,
+  languages,
 }
 
 /// What a doctor practises as — parsed from their certificate where possible,
@@ -23,6 +24,7 @@ class DoctorCredentials {
     this.state,
     this.city,
     this.yearsOfExperience,
+    this.languages = const [],
     this.verifiedFields = const {},
   });
 
@@ -41,6 +43,10 @@ class DoctorCredentials {
   final String? state;
   final String? city;
   final int? yearsOfExperience;
+
+  /// What the doctor can hold a consultation in. At least one, because a
+  /// patient choosing a doctor reads this before anything else.
+  final List<String> languages;
 
   /// Which fields were read off the certificate and checked against the
   /// register — these get a tick in the form.
@@ -82,6 +88,7 @@ class DoctorCredentials {
     if (state == null) DoctorCredentialField.state,
     if (city == null) DoctorCredentialField.city,
     if (yearsOfExperience == null) DoctorCredentialField.yearsOfExperience,
+    if (languages.isEmpty) DoctorCredentialField.languages,
   ];
 
   bool get isComplete => missingFields.isEmpty;
@@ -100,6 +107,7 @@ class DoctorCredentials {
     String? state,
     String? city,
     int? yearsOfExperience,
+    List<String>? languages,
     Set<DoctorCredentialField>? verifiedFields,
     // Changing state normally clears the city, which is the one field that
     // depends on another.
@@ -113,6 +121,7 @@ class DoctorCredentials {
       state: state ?? this.state,
       city: clearCity ? null : city ?? this.city,
       yearsOfExperience: yearsOfExperience ?? this.yearsOfExperience,
+      languages: languages ?? this.languages,
       verifiedFields: verifiedFields ?? this.verifiedFields,
     );
   }

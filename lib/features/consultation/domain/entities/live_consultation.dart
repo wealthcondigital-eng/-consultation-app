@@ -59,6 +59,7 @@ class LiveConsultation {
     required this.isCaller,
     required this.patientName,
     this.isAnonymous = false,
+    this.recordingConsent = false,
     this.doctor,
     this.fee,
     this.scheduledAt,
@@ -87,6 +88,13 @@ class LiveConsultation {
   final String patientName;
 
   final bool isAnonymous;
+
+  /// True when the patient agreed, before filing, to the call being recorded.
+  ///
+  /// The server's copy, read back by both apps: the patient's phone records
+  /// on it and the doctor's shows the badge on it. False when absent, and
+  /// never true on an anonymous consultation.
+  final bool recordingConsent;
 
   /// Null while still searching; set once a doctor is attached.
   final Doctor? doctor;

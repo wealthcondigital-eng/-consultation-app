@@ -123,7 +123,8 @@ class ApiDoctorOnboardingRemoteDataSource
         'fullName': credentials.fullName.trim(),
         'medicalDegree': credentials.medicalDegree,
         'registrationNumber': credentials.registrationNumber.trim(),
-        'specialty': credentials.specialty,
+        'specialty': credentials.specialty?.trim(),
+        'languages': credentials.languages,
         'state': credentials.state,
         'city': credentials.city,
         'yearsOfExperience': credentials.yearsOfExperience,
@@ -246,7 +247,7 @@ class ApiDoctorOnboardingRemoteDataSource
     return DoctorApplication(
       id: id,
       status: _statusFrom(value['status'] as String?),
-      submittedAt: submittedAt == null ? null : DateTime.tryParse(submittedAt),
+      submittedAt: submittedAt == null ? null : DateTime.tryParse(submittedAt)?.toLocal(),
       rejectionReason: value['rejectionReason'] as String?,
     );
   }

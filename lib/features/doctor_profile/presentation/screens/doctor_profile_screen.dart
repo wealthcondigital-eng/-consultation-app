@@ -21,6 +21,7 @@ import '../../../doctor_onboarding/presentation/screens/set_availability_screen.
     show availabilitySummaryText;
 import '../../../home/presentation/widgets/doctor_stats_row.dart';
 import '../../../profile/presentation/widgets/profile_section.dart';
+import '../../../recordings/presentation/widgets/recordings_section.dart';
 import '../controllers/doctor_profile_controller.dart';
 import '../widgets/doctor_profile_header.dart';
 
@@ -303,8 +304,10 @@ class _Body extends StatelessWidget {
                         icon: Icons.workspace_premium_rounded,
                         label: 'Credentials & Documents',
                         onTap: () => onOpen(AppRoutes.doctorCredentials),
-                        showDivider: false,
                       ),
+                      // Recordings patients made of their consultations with
+                      // this doctor, by patient.
+                      const RecordingsEntryRow(),
                     ],
                   ),
                 ),

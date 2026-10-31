@@ -72,6 +72,12 @@ void main() {
     await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
 
+    // Ticked, not applied: nothing changes until Done.
+    expect(sl<ThemeController>().mode, ThemeMode.system);
+
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+
     expect(sl<ThemeController>().mode, ThemeMode.dark);
     expect(AppColors.isDark, isTrue);
     expect(tester.takeException(), isNull);
@@ -86,7 +92,7 @@ void main() {
     expect(second.mode, ThemeMode.dark);
   });
 
-  testWidgets('the appearance sheet repaints itself when the theme changes', (
+  testWidgets('the appearance sheet applies the choice only on Done', (
     tester,
   ) async {
     await sl<ThemeController>().setMode(ThemeMode.dark);
@@ -120,7 +126,15 @@ void main() {
     await tester.tap(find.text('Light'));
     await tester.pumpAndSettle();
 
-    expect(sheetColor(), AppPalette.light.surface);
+    // Still dark while the sheet is open: the tap only ticks Light.
+    expect(sheetColor(), AppPalette.dark.surface);
+    expect(sl<ThemeController>().mode, ThemeMode.dark);
+
+    await tester.tap(find.text('Done'));
+    await tester.pumpAndSettle();
+
+    expect(sl<ThemeController>().mode, ThemeMode.light);
+    expect(find.text('System default'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

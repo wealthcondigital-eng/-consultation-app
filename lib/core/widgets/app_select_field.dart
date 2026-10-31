@@ -21,7 +21,13 @@ class AppSelectField<T> extends StatelessWidget {
     required this.onChanged,
     this.enabled = true,
     this.errorText,
+    this.customValue,
   });
+
+  /// Turns typed text into a value, for a list that cannot be complete — a
+  /// doctor's specialty, say. When set, the sheet always has a search box,
+  /// and a search with no exact match offers to add what was typed.
+  final T Function(String typed)? customValue;
 
   final String label;
 
@@ -43,6 +49,7 @@ class AppSelectField<T> extends StatelessWidget {
       title: label,
       options: options,
       selected: value,
+      customValue: customValue,
     );
 
     if (picked != null) onChanged(picked);
@@ -79,7 +86,14 @@ class AppSelectField<T> extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      tr(selected == null ? hint : options[selected] ?? hint),
+                      tr(
+                        selected == null
+                            ? hint
+                            // A typed-in value is not in [options]; show it
+                            // as it was typed rather than the hint.
+                            : options[selected] ??
+                                  (customValue != null ? '$selected' : hint),
+                      ),
                       style: selected == null
                           ? sizing.text.fieldPlaceholder
                           : sizing.text.fieldValue,
@@ -114,17 +128,22 @@ class AppOptionSheet<T> extends StatelessWidget {
     required this.title,
     required this.options,
     required this.selected,
+    this.customValue,
   });
 
   final String title;
   final Map<T, String> options;
   final T? selected;
 
+  /// See [AppSelectField.customValue].
+  final T Function(String typed)? customValue;
+
   static Future<T?> show<T>(
     BuildContext context, {
     required String title,
     required Map<T, String> options,
     T? selected,
+    T Function(String typed)? customValue,
   }) {
     return showModalBottomSheet<T>(
       context: context,
@@ -137,14 +156,22 @@ class AppOptionSheet<T> extends StatelessWidget {
           top: Radius.circular(context.sizing.radiusLg),
         ),
       ),
-      builder: (_) =>
-          AppOptionSheet<T>(title: title, options: options, selected: selected),
+      builder: (_) => AppOptionSheet<T>(
+        title: title,
+        options: options,
+        selected: selected,
+        customValue: customValue,
+      ),
     );
   }
 
   @override
-  Widget build(BuildContext context) =>
-      _OptionSheetBody<T>(title: title, options: options, selected: selected);
+  Widget build(BuildContext context) => _OptionSheetBody<T>(
+    title: title,
+    options: options,
+    selected: selected,
+    customValue: customValue,
+  );
 }
 
 /// The sheet's contents. Stateful for the search box, which appears once a
@@ -154,11 +181,13 @@ class _OptionSheetBody<T> extends StatefulWidget {
     required this.title,
     required this.options,
     required this.selected,
+    this.customValue,
   });
 
   final String title;
   final Map<T, String> options;
   final T? selected;
+  final T Function(String typed)? customValue;
 
   @override
   State<_OptionSheetBody<T>> createState() => _OptionSheetBodyState<T>();
@@ -179,9 +208,11 @@ class _OptionSheetBodyState<T> extends State<_OptionSheetBody<T>> {
   @override
   Widget build(BuildContext context) {
     final sizing = context.sizing;
-    final searchable = widget.options.length > _searchFrom;
+    final custom = widget.customValue;
+    final searchable = custom != null || widget.options.length > _searchFrom;
 
-    final needle = _query.text.trim().toLowerCase();
+    final typed = _query.text.trim();
+    final needle = typed.toLowerCase();
     final entries = [
       for (final entry in widget.options.entries)
         if (needle.isEmpty ||
@@ -189,6 +220,16 @@ class _OptionSheetBodyState<T> extends State<_OptionSheetBody<T>> {
             tr(entry.value).toLowerCase().contains(needle))
           entry,
     ];
+
+    // Offered only when nothing listed already says exactly this, so a doctor
+    // typing "cardiology" picks the listed "Cardiology" rather than adding a
+    // second spelling that the patient-side filter would treat as different.
+    final exact = entries.any(
+      (entry) =>
+          entry.value.toLowerCase() == needle ||
+          tr(entry.value).toLowerCase() == needle,
+    );
+    final offerCustom = custom != null && typed.length >= 2 && !exact;
 
     return SafeArea(
       // Clear of the keyboard while searching.
@@ -222,13 +263,24 @@ class _OptionSheetBodyState<T> extends State<_OptionSheetBody<T>> {
                     sizing.spacingSm,
                   ),
                   child: AppSearchField(
-                    hint: tr('Search'),
+                    hint: tr(
+                      custom != null ? 'Search or type your own' : 'Search',
+                    ),
                     controller: _query,
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
+              if (offerCustom)
+                _OptionRow(
+                  label: tr('Add "{value}"', {'value': typed}),
+                  icon: Icons.add_circle_outline_rounded,
+                  isSelected: false,
+                  onTap: () => Navigator.of(context).pop(custom(typed)),
+                ),
               Flexible(
-                child: entries.isEmpty
+                child: entries.isEmpty && offerCustom
+                    ? const SizedBox.shrink()
+                    : entries.isEmpty
                     ? Padding(
                         padding: EdgeInsets.all(sizing.spacingLg),
                         child: Text(
@@ -266,11 +318,15 @@ class _OptionRow extends StatelessWidget {
     required this.label,
     required this.isSelected,
     required this.onTap,
+    this.icon,
   });
 
   final String label;
   final bool isSelected;
   final VoidCallback onTap;
+
+  /// A leading glyph, for the "Add …" row that is not one of the options.
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
@@ -285,6 +341,10 @@ class _OptionRow extends StatelessWidget {
         ),
         child: Row(
           children: [
+            if (icon case final glyph?) ...[
+              Icon(glyph, size: sizing.iconMd, color: AppColors.primary),
+              SizedBox(width: sizing.spacingSm),
+            ],
             Expanded(
               child: Text(
                 tr(label),

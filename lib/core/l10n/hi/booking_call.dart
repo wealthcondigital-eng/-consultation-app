@@ -2,6 +2,20 @@
 /// as it is passed to `tr()`. Keep placeholders like `{name}` unchanged.
 const Map<String, String> hiBookingCall = {
   // ---------------------------------------------------------------------------
+  // Switching between the patient and doctor profiles of one account
+  // ---------------------------------------------------------------------------
+  'Switch to doctor profile': 'डॉक्टर प्रोफ़ाइल पर जाएँ',
+  'Open your practice': 'अपनी प्रैक्टिस खोलें',
+  'Register as a doctor': 'डॉक्टर के रूप में रजिस्टर करें',
+  'Same number, a separate doctor profile': 'वही नंबर, एक अलग डॉक्टर प्रोफ़ाइल',
+  'Switch to patient profile': 'मरीज़ प्रोफ़ाइल पर जाएँ',
+  'Use as a patient': 'मरीज़ के रूप में इस्तेमाल करें',
+  'You will go offline as a doctor': 'डॉक्टर के रूप में आप ऑफ़लाइन हो जाएँगे',
+  'Switching…': 'बदला जा रहा है…',
+  "Couldn't switch profiles. Please try again.":
+      'प्रोफ़ाइल नहीं बदल सकी। कृपया फिर से कोशिश करें।',
+
+  // ---------------------------------------------------------------------------
   // Auth — phone login and OTP
   // ---------------------------------------------------------------------------
   'Sign in': 'साइन इन',
@@ -38,8 +52,6 @@ const Map<String, String> hiBookingCall = {
   'Resend OTP': 'OTP दोबारा भेजें',
   'Resend OTP in': 'OTP दोबारा भेजने में',
   'A new code is on its way.': 'नया कोड भेजा जा रहा है।',
-  'This number is already registered under a different role.':
-      'यह नंबर पहले से किसी दूसरी भूमिका में रजिस्टर्ड है।',
   'That code is incorrect. Please try again.':
       'यह कोड गलत है। कृपया फिर से कोशिश करें।',
 
@@ -331,4 +343,10 @@ const Map<String, String> hiBookingCall = {
       'कॉल शुरू करने के लिए कैमरा और माइक्रोफ़ोन की अनुमति दें।',
   'Allow microphone access to start the call.':
       'कॉल शुरू करने के लिए माइक्रोफ़ोन की अनुमति दें।',
+
+  // ---------------------------------------------------------------------------
+  // Call recording
+  // ---------------------------------------------------------------------------
+  'Recording': 'रिकॉर्डिंग',
+  'Uploading recording…': 'रिकॉर्डिंग अपलोड हो रही है…',
 };

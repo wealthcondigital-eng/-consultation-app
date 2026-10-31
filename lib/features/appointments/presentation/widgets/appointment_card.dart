@@ -24,6 +24,7 @@ class AppointmentCard extends StatelessWidget {
     this.onRejoin,
     this.onViewReceipt,
     this.onTap,
+    this.onOpenChat,
   });
 
   final Appointment appointment;
@@ -38,6 +39,11 @@ class AppointmentCard extends StatelessWidget {
 
   /// The whole card, when it leads somewhere. Falls back to [onViewReceipt].
   final VoidCallback? onTap;
+
+  /// Opens the chat with the other person, where the call recordings of
+  /// their consultations are. Shown on a finished, named consultation only:
+  /// an anonymous one is never recorded and has nobody to link to.
+  final VoidCallback? onOpenChat;
 
   @override
   Widget build(BuildContext context) {
@@ -110,6 +116,14 @@ class AppointmentCard extends StatelessWidget {
                       if (showRejoin) ...[
                         SizedBox(height: sizing.spacingSm),
                         _RejoinButton(onTap: onRejoin),
+                      ],
+                      if (onOpenChat case final openChat?
+                          when appointment.status ==
+                                  AppointmentStatus.completed &&
+                              !appointment.isAnonymous &&
+                              appointment.counterpartId != null) ...[
+                        SizedBox(height: sizing.spacingSm),
+                        _ChatButton(onTap: openChat),
                       ],
                     ],
                   ),
@@ -548,6 +562,39 @@ class _RejoinButton extends StatelessWidget {
         ),
         icon: Icon(Icons.login_rounded, size: sizing.iconXs),
         label: Text(tr('Rejoin call'), style: sizing.text.buttonLabelCompact),
+      ),
+    );
+  }
+}
+
+/// "Chat & recordings": the two people's thread, holding the call recordings.
+class _ChatButton extends StatelessWidget {
+  const _ChatButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final sizing = context.sizing;
+
+    return SizedBox(
+      height: sizing.buttonHeightCompact,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: BorderSide(color: AppColors.primary, width: sizing.hairline),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(sizing.radiusMd),
+          ),
+        ),
+        icon: Icon(Icons.forum_rounded, size: sizing.iconXs),
+        label: Text(
+          tr('Chat & recordings'),
+          style: sizing.text.buttonLabelCompact.copyWith(
+            color: AppColors.primary,
+          ),
+        ),
       ),
     );
   }

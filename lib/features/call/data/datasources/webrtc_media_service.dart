@@ -234,10 +234,12 @@ class WebRtcMediaService {
               // phones show counts from now — not from when the call screen
               // opened, which included the ringing.
               unawaited(
-                _signalling.markConnected(consultationId).catchError(
-                  (Object error) =>
-                      debugPrint('Could not report connected: $error'),
-                ),
+                _signalling
+                    .markConnected(consultationId)
+                    .catchError(
+                      (Object error) =>
+                          debugPrint('Could not report connected: $error'),
+                    ),
               );
               _startSignalling(
                 consultationId: consultationId,
@@ -317,8 +319,12 @@ class WebRtcMediaService {
                 // A request, not a demand. `mandatory` with a minimum frame rate
                 // is refused outright by phones that cannot meet it, and a
                 // slightly softer picture is better than no call.
-                'width': {'ideal': 640},
-                'height': {'ideal': 480},
+                //
+                // 720p asked for so the recording the patient keeps can be HD.
+                // WebRTC still steps the picture down on a weak connection, so
+                // this costs nothing on a poor network.
+                'width': {'ideal': 1280},
+                'height': {'ideal': 720},
                 'frameRate': {'ideal': 24},
                 'facingMode': 'user',
               }
@@ -442,6 +448,44 @@ class WebRtcMediaService {
   }
 
   final List<Map<String, dynamic>> _pendingCandidates = [];
+
+  /// The other side's camera, once it has arrived — what the patient's phone
+  /// records the doctor's picture from. Null on a voice call.
+  MediaStreamTrack? get remoteVideoTrack {
+    final tracks = _remoteStream?.getVideoTracks() ?? const [];
+    return tracks.isEmpty ? null : tracks.first;
+  }
+
+  /// True once the other side's audio is actually arriving and being played —
+  /// the connection's own statistics say packets and samples have come in.
+  ///
+  /// What the recorder waits for. It captures the speaker side by attaching to
+  /// WebRTC's playout, and that only exists once remote audio is flowing;
+  /// asking the connection is exact, where a fixed delay was a guess that was
+  /// either too long (the first words of the call missing) or too short.
+  Future<bool> remoteAudioFlowing() async {
+    final pc = _peerConnection;
+    if (pc == null) return false;
+
+    try {
+      for (final report in await pc.getStats()) {
+        if (report.type != 'inbound-rtp') continue;
+        final values = report.values;
+        final kind = values['kind'] ?? values['mediaType'];
+        if (kind != 'audio') continue;
+
+        final packets = values['packetsReceived'];
+        final samples = values['totalSamplesReceived'];
+        if ((packets is num && packets > 0) ||
+            (samples is num && samples > 0)) {
+          return true;
+        }
+      }
+    } catch (_) {
+      // Stats unavailable: the caller falls back to its time limit.
+    }
+    return false;
+  }
 
   Future<void> toggleAudioMute(bool mute) async {
     for (final track in _localStream?.getAudioTracks() ?? const []) {

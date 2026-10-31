@@ -239,9 +239,12 @@ void main() {
         200,
         scrollable: find.byType(Scrollable).first,
       );
+      // Not the first tile: that is Stress Management, pinned ahead of the
+      // rest, and the sample doctors include nobody under it.
+      await tester.ensureVisible(find.text('Cardio', skipOffstage: false));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byType(SpecialityTile).first);
+      await tester.tap(find.text('Cardio'));
       await tester.pumpAndSettle();
 
       await tester.tap(find.byType(DoctorListCard).first);

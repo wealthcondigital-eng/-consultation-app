@@ -17,6 +17,7 @@ class AppCheckbox extends StatelessWidget {
     required this.semanticLabel,
     this.errorText,
     this.enabled = true,
+    this.activeColor,
   });
 
   final bool value;
@@ -31,6 +32,11 @@ class AppCheckbox extends StatelessWidget {
   final String? errorText;
   final bool enabled;
 
+  /// The fill and border when ticked. Defaults to [AppColors.primary]; a
+  /// screen with its own accent — the anonymous consent popup is violet —
+  /// passes that, so the tick matches the button beside it.
+  final Color? activeColor;
+
   @override
   Widget build(BuildContext context) {
     final sizing = context.sizing;
@@ -41,20 +47,32 @@ class AppCheckbox extends StatelessWidget {
       children: [
         Semantics(
           checked: value,
+          enabled: enabled,
           label: tr(semanticLabel),
-          child: InkWell(
+          // A GestureDetector does not announce itself as tappable the way
+          // an InkWell did, so the tap is offered to screen readers here.
+          onTap: enabled ? () => onChanged(!value) : null,
+          child: GestureDetector(
+            // Opaque, so the gaps between the box and the words count as
+            // part of the target rather than falling through.
+            behavior: HitTestBehavior.opaque,
             onTap: enabled ? () => onChanged(!value) : null,
-            borderRadius: BorderRadius.circular(sizing.radiusSm),
+            excludeFromSemantics: true,
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Nudged down so it optically aligns with the first text line.
                 Padding(
                   padding: EdgeInsets.only(top: sizing.spacingXxs * 0.5),
-                  child: _Box(checked: value, hasError: hasError),
+                  child: _Box(
+                    checked: value,
+                    hasError: hasError,
+                    activeColor: activeColor ?? AppColors.primary,
+                  ),
                 ),
                 SizedBox(width: sizing.spacingXs + 2),
-                // Excluded because the InkWell already announces the label.
+                // Excluded because the Semantics above already announces the
+                // label.
                 Expanded(child: ExcludeSemantics(child: label)),
               ],
             ),
@@ -70,10 +88,15 @@ class AppCheckbox extends StatelessWidget {
 }
 
 class _Box extends StatelessWidget {
-  const _Box({required this.checked, required this.hasError});
+  const _Box({
+    required this.checked,
+    required this.hasError,
+    required this.activeColor,
+  });
 
   final bool checked;
   final bool hasError;
+  final Color activeColor;
 
   @override
   Widget build(BuildContext context) {
@@ -85,13 +108,13 @@ class _Box extends StatelessWidget {
       height: sizing.checkboxSize,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: checked ? AppColors.primary : AppColors.surface,
+        color: checked ? activeColor : AppColors.surface,
         borderRadius: BorderRadius.circular(sizing.radiusXs),
         border: Border.all(
           width: sizing.hairline,
           color: switch ((hasError, checked)) {
             (true, _) => AppColors.danger,
-            (false, true) => AppColors.primary,
+            (false, true) => activeColor,
             (false, false) => AppColors.border,
           },
         ),

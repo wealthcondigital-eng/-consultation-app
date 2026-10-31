@@ -146,7 +146,7 @@ class ApiDoctorPracticeRemoteDataSource
             name: row['name'] as String? ?? 'Patient',
             consultations: (row['consultations'] as num?)?.toInt() ?? 0,
             lastConsultedAt:
-                DateTime.tryParse(row['lastConsultedAt'] as String? ?? '') ??
+                DateTime.tryParse(row['lastConsultedAt'] as String? ?? '')?.toLocal() ??
                 DateTime.now(),
             lastMode: row['lastMode'] == 'audio'
                 ? ConsultationMode.audio
@@ -328,11 +328,11 @@ class ApiDoctorPracticeRemoteDataSource
         _ => 'application/octet-stream',
       },
       uploadedAt:
-          DateTime.tryParse(row['uploadedAt'] as String? ?? '') ??
+          DateTime.tryParse(row['uploadedAt'] as String? ?? '')?.toLocal() ??
           DateTime.now(),
       decision: CredentialDecision.from(row['decision'] as String?),
       note: row['note'] as String?,
-      reviewedAt: DateTime.tryParse(row['reviewedAt'] as String? ?? ''),
+      reviewedAt: DateTime.tryParse(row['reviewedAt'] as String? ?? '')?.toLocal(),
     );
   }
 
@@ -383,7 +383,7 @@ class ApiDoctorPracticeRemoteDataSource
           : const [],
       photoUrl: value['photoUrl'] as String?,
       rejectionReason: value['rejectionReason'] as String?,
-      submittedAt: DateTime.tryParse(value['submittedAt'] as String? ?? ''),
+      submittedAt: DateTime.tryParse(value['submittedAt'] as String? ?? '')?.toLocal(),
       videoFee: fees is Map<String, Object?>
           ? (fees['video'] as num?)?.toInt()
           : null,
@@ -472,7 +472,7 @@ class ApiDoctorPracticeRemoteDataSource
                 ? ConsultationMode.audio
                 : ConsultationMode.video,
             endedAt:
-                DateTime.tryParse(row['endedAt'] as String? ?? '') ??
+                DateTime.tryParse(row['endedAt'] as String? ?? '')?.toLocal() ??
                 DateTime.now(),
             fee: (row['fee'] as num?)?.toInt() ?? 0,
             durationSeconds: (row['durationSeconds'] as num?)?.toInt() ?? 0,

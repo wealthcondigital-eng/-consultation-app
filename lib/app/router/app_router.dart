@@ -7,7 +7,9 @@ import '../../features/appointments/presentation/screens/appointments_screen.dar
 import '../../features/appointments/presentation/screens/consultation_receipt_screen.dart';
 import '../../features/auth/presentation/screens/otp_verification_screen.dart';
 import '../../features/call/presentation/screens/call_screen.dart';
-import '../../features/chat/presentation/screens/chat_screen.dart';
+import '../../features/recordings/presentation/screens/recording_player_screen.dart';
+import '../../features/recordings/presentation/screens/recordings_chat_screen.dart';
+import '../../features/recordings/presentation/screens/recordings_screen.dart';
 import '../../features/consultation/presentation/screens/consult_options_screen.dart';
 import '../../features/doctor_onboarding/domain/entities/doctor_application.dart';
 import '../../features/doctor_onboarding/domain/entities/doctor_availability.dart';
@@ -305,7 +307,18 @@ class AppRouter {
 
       case AppRoutes.chat:
         return _route(
-          ChatScreen(args: settings.arguments! as ChatArgs),
+          RecordingsChatScreen(args: settings.arguments! as RecordingsChatArgs),
+          settings,
+        );
+
+      case AppRoutes.recordings:
+        return _route(const RecordingsScreen(), settings);
+
+      case AppRoutes.recordingPlayer:
+        return _route(
+          RecordingPlayerScreen(
+            args: settings.arguments! as RecordingPlayerArgs,
+          ),
           settings,
         );
 

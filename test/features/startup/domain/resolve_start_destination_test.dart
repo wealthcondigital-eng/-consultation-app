@@ -13,6 +13,7 @@ import 'package:consultation_app/features/doctor_onboarding/domain/entities/prac
 import 'package:consultation_app/features/doctor_onboarding/domain/repositories/doctor_onboarding_repository.dart';
 import 'package:consultation_app/features/onboarding/domain/repositories/role_repository.dart';
 import 'package:consultation_app/features/onboarding/domain/usecases/get_selected_role.dart';
+import 'package:consultation_app/features/onboarding/domain/usecases/select_role.dart';
 import 'package:consultation_app/features/auth/domain/entities/phone_number.dart';
 import 'package:consultation_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:consultation_app/features/onboarding/domain/entities/user_role.dart';
@@ -216,7 +217,12 @@ ResolveStartDestination _useCase({
 
   /// The journey this person chose, as it survives a restart.
   UserRole? storedRole,
+
+  /// Receives whatever the use case writes back as the stored role.
+  _StubRoleRepository? roles,
 }) {
+  final roleRepository = roles ?? _StubRoleRepository(role: storedRole);
+
   return ResolveStartDestination(
     _StubAuthRepository(isSignedIn: signedIn),
     _StubProfileRepository(
@@ -232,20 +238,24 @@ ResolveStartDestination _useCase({
       practiceSetupThrows: practiceSetupThrows,
     ),
     IsAdmin(_StubAdminRepository(admin: isAdmin)),
-    GetSelectedRole(_StubRoleRepository(role: storedRole)),
+    GetSelectedRole(roleRepository),
+    SelectRole(roleRepository),
   );
 }
 
 class _StubRoleRepository implements RoleRepository {
-  const _StubRoleRepository({this.role});
+  _StubRoleRepository({this.role});
 
-  final UserRole? role;
+  UserRole? role;
+
+  /// The last role written back, if any.
+  UserRole? saved;
 
   @override
   Future<UserRole?> readSelectedRole() async => role;
 
   @override
-  Future<void> saveSelectedRole(UserRole role) async {}
+  Future<void> saveSelectedRole(UserRole role) async => saved = role;
 
   @override
   Future<void> clearSelectedRole() async {}
@@ -409,44 +419,56 @@ void main() {
       expect(entry.notice, contains("couldn't confirm"));
     });
 
-    test('a registered doctor cannot enter the patient app', () async {
-      // A phone number is one person, and one person is either consulting or
-      // being consulted. Without this the two journeys could both be entered
-      // from the same number, leaving two half-built accounts on one identity.
+    test('a doctor who chose Patient gets their patient dashboard', () async {
+      // Doctors can be patients too: one number, both profiles, and the side
+      // they chose is the side that opens.
       final entry = await _useCase(
         signedIn: true,
-        application: const DoctorApplication(
-          id: 'application-1',
-          status: DoctorApplicationStatus.approved,
-        ),
+        application: _application(DoctorApplicationStatus.approved),
+        practiceSetup: const PracticeSetup(videoFee: 500),
         storedRole: UserRole.patient,
       )();
 
-      expect(entry.destination, StartDestination.roleConflict);
-      expect(entry.notice, contains('already registered as a doctor'));
+      expect(entry.destination, StartDestination.home);
     });
 
-    test('a registered patient cannot enter the doctor app', () async {
+    test('a doctor with no patient profile who chose Patient is asked for '
+        'one', () async {
+      final entry = await _useCase(
+        signedIn: true,
+        profileExists: false,
+        application: _application(DoctorApplicationStatus.approved),
+      ).forSignedInUser(role: UserRole.patient);
+
+      expect(entry.destination, StartDestination.completeProfile);
+    });
+
+    test('a patient who chose Doctor starts doctor registration', () async {
       final entry = await _useCase(
         signedIn: true,
         profileExists: true,
+      ).forSignedInUser(role: UserRole.doctor);
+
+      expect(entry.destination, StartDestination.doctorSetup);
+    });
+
+    test('a patient who chose Doctor follows their application', () async {
+      final entry = await _useCase(
+        signedIn: true,
+        profileExists: true,
+        application: _application(DoctorApplicationStatus.underReview),
         storedRole: UserRole.doctor,
       )();
 
-      expect(entry.destination, StartDestination.roleConflict);
-      expect(entry.notice, contains('already registered as a patient'));
+      expect(entry.destination, StartDestination.doctorPending);
     });
 
     test('a failed patient lookup does not put a doctor on the certificate '
         'form', () async {
-      // The conflict is only raised on an answer, never on a guess: the
-      // patient lookup reports true when it *fails*, and treating that as a
-      // registration would turn a flaky connection into a doctor refused
-      // their own journey.
-      //
-      // It lands on the role choice rather than the certificate form. The form
-      // asks for a medical certificate, so a doctor who filed one months ago
-      // was told to upload it again by a lookup that never actually answered.
+      // On a cold launch the certificate form with no application is either
+      // an abandoned registration or — for someone with a patient profile — a
+      // reason to open the patient side instead. A failed patient lookup
+      // cannot say which, so the session is kept and the role choice shown.
       final entry = await _useCase(
         signedIn: true,
         profileThrows: true,
@@ -475,21 +497,62 @@ void main() {
       final entry = await _useCase(
         signedIn: true,
         application: _application(DoctorApplicationStatus.rejected),
+        storedRole: UserRole.doctor,
       )();
 
       expect(entry.destination, StartDestination.doctorSetup);
     });
 
-    test('an application outranks an existing patient record', () async {
-      // Someone who used the app as a patient and later applied is a doctor
-      // now; the registration is the more recent intent.
-      final entry = await _useCase(
-        signedIn: true,
-        profileExists: true,
-        application: _application(DoctorApplicationStatus.underReview),
-      )();
+    group('with no stored choice', () {
+      test('a working practice outranks a patient record', () async {
+        final roles = _StubRoleRepository();
+        final entry = await _useCase(
+          signedIn: true,
+          profileExists: true,
+          application: _application(DoctorApplicationStatus.approved),
+          practiceSetup: const PracticeSetup(videoFee: 500),
+          roles: roles,
+        )();
 
-      expect(entry.destination, StartDestination.doctorPending);
+        expect(entry.destination, StartDestination.doctorHome);
+        expect(roles.saved, UserRole.doctor, reason: 'the choice is stored');
+      });
+
+      test('an application still under review does not outrank a patient '
+          'record', () async {
+        // The patient side is a whole app they can use today; the doctor side
+        // is a status screen, one tap away on the profile.
+        final roles = _StubRoleRepository();
+        final entry = await _useCase(
+          signedIn: true,
+          profileExists: true,
+          application: _application(DoctorApplicationStatus.underReview),
+          roles: roles,
+        )();
+
+        expect(entry.destination, StartDestination.home);
+        expect(roles.saved, UserRole.patient);
+      });
+
+      test(
+        'an application with no patient record goes to the doctor side',
+        () async {
+          final entry = await _useCase(
+            signedIn: true,
+            profileExists: false,
+            application: _application(DoctorApplicationStatus.underReview),
+          )();
+
+          expect(entry.destination, StartDestination.doctorPending);
+        },
+      );
+
+      test('no records of any kind returns to the role choice', () async {
+        final entry = await _useCase(signedIn: true, profileExists: false)();
+
+        expect(entry.destination, StartDestination.landing);
+        expect(entry.notice, isNull);
+      });
     });
 
     test('a brand-new doctor with no application starts at setup', () async {
@@ -662,6 +725,36 @@ void main() {
         expect(entry.destination, StartDestination.doctorSetup);
       },
     );
+
+    test('a patient who left doctor registration half-done reopens as a '
+        'patient, signed in', () async {
+      // They have a working account on the other side; signing them out would
+      // cost a code to get back to it.
+      final roles = _StubRoleRepository(role: UserRole.doctor);
+      final entry = await _useCase(
+        signedIn: true,
+        profileExists: true,
+        roles: roles,
+      )();
+
+      expect(entry.destination, StartDestination.home);
+      expect(roles.saved, UserRole.patient);
+    });
+
+    test('a doctor who left the patient form half-done reopens as a doctor, '
+        'signed in', () async {
+      final roles = _StubRoleRepository(role: UserRole.patient);
+      final entry = await _useCase(
+        signedIn: true,
+        profileExists: false,
+        application: _application(DoctorApplicationStatus.approved),
+        practiceSetup: const PracticeSetup(audioFee: 300),
+        roles: roles,
+      )();
+
+      expect(entry.destination, StartDestination.doctorHome);
+      expect(roles.saved, UserRole.doctor);
+    });
 
     test('an unreachable server is not an abandoned registration', () async {
       // The session is deliberately kept on a failed lookup, and turning that

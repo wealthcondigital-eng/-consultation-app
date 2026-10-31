@@ -66,7 +66,7 @@ class ApiScheduleRemoteDataSource implements ScheduleRemoteDataSource {
   static ScheduleDay? _dayFrom(Object? row) {
     if (row is! Map) return null;
 
-    final date = DateTime.tryParse(row['date'] as String? ?? '');
+    final date = DateTime.tryParse(row['date'] as String? ?? '')?.toLocal();
     if (date == null) return null;
 
     final slots = row['slots'];

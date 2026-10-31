@@ -23,6 +23,7 @@ import '../controllers/patient_profile_controller.dart';
 import '../widgets/medical_history_card.dart';
 import '../widgets/patient_stats_card.dart';
 import '../widgets/profile_section.dart';
+import '../../../recordings/presentation/widgets/recordings_section.dart';
 
 /// My Profile as a standalone route: the view inside the shared page shell.
 ///
@@ -314,8 +315,9 @@ class _Body extends StatelessWidget {
                         onTap: () => Navigator.of(
                           context,
                         ).pushNamed(AppRoutes.patientAppointments),
-                        showDivider: false,
                       ),
+                      // The consultations this patient recorded, by doctor.
+                      const RecordingsEntryRow(),
                     ],
                   ),
                 ),

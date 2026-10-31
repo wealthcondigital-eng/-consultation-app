@@ -81,7 +81,12 @@ void main() {
         Speciality.named('Nuclear Medicine').symbol,
         SpecialitySymbol.general,
       );
-      expect(Speciality.named('Rheumatology').symbol, SpecialitySymbol.other);
+      expect(Speciality.named('Oncology').symbol, SpecialitySymbol.other);
+      // Joints: drawn with the bones, not left generic.
+      expect(
+        Speciality.named('Rheumatology').symbol,
+        SpecialitySymbol.orthopaedics,
+      );
       expect(
         Speciality.named('Pediatric Surgery').symbol,
         SpecialitySymbol.paediatrics,

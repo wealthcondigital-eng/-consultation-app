@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/responsive/app_sizing.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/remote_avatar.dart';
 import '../../../doctors/domain/entities/doctor.dart';
 
 /// A doctor in the listing: avatar, name, credentials and rating.
@@ -30,19 +31,11 @@ class DoctorCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              Container(
-                width: sizing.avatarSize,
-                height: sizing.avatarSize,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.avatarSurface,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.person_rounded,
-                  size: sizing.iconMd,
-                  color: AppColors.textSecondary,
-                ),
+              RemoteAvatar(
+                path: doctor.photoUrl,
+                initials: initialsOf(doctor.name),
+                size: sizing.avatarSize,
+                semanticLabel: doctor.name,
               ),
               SizedBox(width: sizing.spacingSm),
               Expanded(

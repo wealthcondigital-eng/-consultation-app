@@ -35,6 +35,13 @@ abstract class CallRepository {
 
   Future<void> endCall();
 
+  /// The other side's video track, for the call recorder. Null until it
+  /// arrives, and on a voice call.
+  MediaStreamTrack? get remoteVideoTrack;
+
+  /// True once the other side's audio is arriving — when recording can start.
+  Future<bool> remoteAudioFlowing();
+
   Future<void> disposeRenderers(
     RTCVideoRenderer localRenderer,
     RTCVideoRenderer remoteRenderer,

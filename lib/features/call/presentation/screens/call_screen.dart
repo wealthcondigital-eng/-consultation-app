@@ -30,6 +30,8 @@ class CallArgs {
     this.isCaller = true,
     this.peerName,
     this.peerSubtitle,
+    this.recordingConsent = false,
+    this.isAnonymous = false,
   });
 
   /// From a brokered consultation, which is where every real call comes from:
@@ -61,6 +63,8 @@ class CallArgs {
           : consultation.isAnonymous
           ? 'Anonymous patient'
           : 'Patient',
+      recordingConsent: consultation.recordingConsent,
+      isAnonymous: consultation.isAnonymous,
     );
   }
 
@@ -97,6 +101,20 @@ class CallArgs {
   /// One line under [displayName] — the doctor's speciality on the patient's
   /// side, and what kind of caller this is on the doctor's.
   final String? peerSubtitle;
+
+  /// The patient agreed to this consultation being recorded.
+  final bool recordingConsent;
+
+  final bool isAnonymous;
+
+  /// True when this consultation is recorded at all — consented, attached to
+  /// a record, and never anonymous.
+  bool get isRecorded =>
+      recordingConsent && !isAnonymous && consultationId != null;
+
+  /// True when *this* phone does the recording: the patient's, which is the
+  /// side that dials. The doctor's phone only shows the badge.
+  bool get recordsHere => isRecorded && isCaller;
 
   /// The name to put at the top of the call.
   String get displayName {
@@ -220,7 +238,19 @@ class _CallScreenState extends State<CallScreen> {
       consultationId: widget.args.consultationId,
       peerId: widget.args.peerId,
       isCaller: widget.args.isCaller,
+      record: widget.args.recordsHere,
     );
+  }
+
+  /// The red badge. On the patient's phone it follows the recorder itself;
+  /// on the doctor's it follows the consultation, from the moment the call is
+  /// live — the doctor cannot see the patient's recorder, and should know it
+  /// is on all the same.
+  bool get _showRecordingBadge {
+    if (widget.args.recordsHere) return _controller.isRecording;
+    return widget.args.isRecorded &&
+        (_controller.state == CallState.connected ||
+            _controller.state == CallState.reconnecting);
   }
 
   /// Whether the screen is currently set to go dark against the ear.
@@ -462,6 +492,7 @@ class _CallScreenState extends State<CallScreen> {
                             ],
                           ),
                         ),
+                        if (_showRecordingBadge) const _RecordingBadge(),
                       ],
                     ),
                   ),
@@ -782,6 +813,83 @@ class _AudioStatePill extends StatelessWidget {
             tr(label),
             style: sizing.text.metaLabel.copyWith(
               color: tone,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "● Recording", top right, on both phones while the call is being recorded.
+///
+/// Small and steady rather than blinking: it is there so nobody is recorded
+/// without seeing it, not to compete with the person they are talking to.
+/// "● Recording", with the dot blinking — on both phones, so neither side
+/// can miss that the call is being kept.
+class _RecordingBadge extends StatefulWidget {
+  const _RecordingBadge();
+
+  @override
+  State<_RecordingBadge> createState() => _RecordingBadgeState();
+}
+
+class _RecordingBadgeState extends State<_RecordingBadge>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _blink = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 700),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _blink.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sizing = context.sizing;
+
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: sizing.spacingSm,
+        vertical: sizing.spacingXxs,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(sizing.radiusPill),
+        border: Border.all(color: AppColors.danger.withValues(alpha: 0.7)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FadeTransition(
+            opacity: Tween<double>(
+              begin: 1,
+              end: 0.15,
+            ).animate(CurvedAnimation(parent: _blink, curve: Curves.easeInOut)),
+            child: Container(
+              width: sizing.r(9),
+              height: sizing.r(9),
+              decoration: BoxDecoration(
+                color: AppColors.danger,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.danger.withValues(alpha: 0.6),
+                    blurRadius: sizing.r(6),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(width: sizing.spacingXs),
+          Text(
+            tr('Recording'),
+            style: sizing.text.metaLabel.copyWith(
+              color: Colors.white,
               fontWeight: FontWeight.w600,
             ),
           ),

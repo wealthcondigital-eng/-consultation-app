@@ -17,7 +17,7 @@ import 'payment_gateway.dart';
 /// inside a `WebView` cannot — the intent either does nothing or leaves the
 /// patient stranded in a browser with no way back into the app, which is the
 /// single most common way a checkout loses a payment in India. The SDK also
-/// brings saved cards, netbanking and the retry UI for free.
+/// brings saved cards and the retry UI for free.
 ///
 /// **This class is one third of the flow, and the weakest third.** It opens a
 /// sheet and reports what came back; it proves nothing. The other two thirds
@@ -57,7 +57,7 @@ class RazorpayPaymentGateway implements PaymentGateway {
   @override
   bool get isLive => _keyId.isNotEmpty;
 
-  /// UPI, cards, netbanking, saved cards and the UPI-app handoff are all inside
+  /// UPI, cards, saved cards and the UPI-app handoff are all inside
   /// Razorpay's own sheet. Asking in the app as well is the same question
   /// twice, and the answer given here is thrown away by the one that follows.
   @override
@@ -124,6 +124,19 @@ class RazorpayPaymentGateway implements PaymentGateway {
       // pays. Letting checkout sit open indefinitely would hold it all day.
       'timeout': 300,
       'retry': {'enabled': true, 'max_count': 1},
+      // UPI and cards only. Netbanking and wallets are hidden from the sheet;
+      // `config.display.hide` is Razorpay's current switch and `method` the
+      // older one, and the Android SDK has honoured each at different times.
+      'method': {'netbanking': false, 'wallet': false},
+      'config': {
+        'display': {
+          'hide': [
+            {'method': 'netbanking'},
+            {'method': 'wallet'},
+          ],
+          'preferences': {'show_default_blocks': true},
+        },
+      },
     });
 
     return completer.future;

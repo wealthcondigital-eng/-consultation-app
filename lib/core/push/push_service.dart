@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../features/notifications/domain/entities/app_notification.dart';
 import '../logging/auth_logger.dart';
@@ -146,6 +147,55 @@ class PushService {
         enableVibration: true,
       );
 
+  /// Where news about the account itself lands — today, the decision on a
+  /// doctor's registration. Must match `channelId: 'account'` in the server's
+  /// `PushService.sendRegistrationDecision`.
+  static const AndroidNotificationChannel _accountChannel =
+      AndroidNotificationChannel(
+        'account',
+        'Account updates',
+        description: 'Tells you when your registration has been reviewed.',
+        importance: Importance.high,
+        playSound: true,
+        enableVibration: true,
+      );
+
+  /// "A new version is on Play". Its own channel so it can be muted without
+  /// muting anything that matters more. Must match `channelId: 'updates'` in
+  /// the server's `PushService.sendAppUpdate`.
+  static const AndroidNotificationChannel _updatesChannel =
+      AndroidNotificationChannel(
+        'updates',
+        'App updates',
+        description: 'Tells you when a new version of the app is available.',
+        importance: Importance.defaultImportance,
+      );
+
+  /// What to do when an update notification arrives or is tapped. `main`
+  /// points it at the update controller, which asks Play and raises the
+  /// popup — core push code does not know about either.
+  static VoidCallback? _onAppUpdate;
+  static bool _appUpdatePending = false;
+
+  static set onAppUpdate(VoidCallback? handler) {
+    _onAppUpdate = handler;
+    if (handler != null && _appUpdatePending) {
+      _appUpdatePending = false;
+      handler();
+    }
+  }
+
+  /// Hands the update to whoever is listening, or keeps it for them — the
+  /// tap that launched the app arrives before `main` has wired anything.
+  static void _announceAppUpdate() {
+    final handler = _onAppUpdate;
+    if (handler == null) {
+      _appUpdatePending = true;
+      return;
+    }
+    handler();
+  }
+
   /// Appointment messages as they arrive, for whatever is on screen.
   ///
   /// The notification bell listens: a reminder that lands while the app is open
@@ -242,12 +292,32 @@ class PushService {
         // someone is using the app is silently swallowed — which is the worst
         // of the three states to lose it in, because they are right there.
         final appointment = AppointmentPush.tryParse(message.data);
-        if (appointment != null) await showAppointment(appointment);
+        if (appointment != null) {
+          await showAppointment(appointment);
+          return;
+        }
+
+        // `registration_approved`, `_rejected` or `_changes_requested`.
+        if ('${message.data['type']}'.startsWith('registration_')) {
+          await _showAccountNotice(message.data);
+          return;
+        }
+
+        // A new version on Play, arriving while the app is open: say so in
+        // the tray, and ask Play now so the update popup comes up too.
+        if (message.data['type'] == 'app_update') {
+          await _showAppUpdate(message.data);
+          _announceAppUpdate();
+        }
       });
 
       // Tapped while the app was in the background. The system drew this one,
       // so the local-notification tap handler never sees it.
       FirebaseMessaging.onMessageOpenedApp.listen((message) {
+        if (message.data['type'] == 'app_update') {
+          _announceAppUpdate();
+          return;
+        }
         final appointment = AppointmentPush.tryParse(message.data);
         if (appointment != null) _openAppointment(appointment);
       });
@@ -257,8 +327,12 @@ class PushService {
       // delivered, so nothing above fires for it and it has to be asked for.
       final launch = await FirebaseMessaging.instance.getInitialMessage();
       if (launch != null) {
-        final appointment = AppointmentPush.tryParse(launch.data);
-        if (appointment != null) _openAppointment(appointment);
+        if (launch.data['type'] == 'app_update') {
+          _announceAppUpdate();
+        } else {
+          final appointment = AppointmentPush.tryParse(launch.data);
+          if (appointment != null) _openAppointment(appointment);
+        }
       }
 
       await _notifications.initialize(
@@ -272,6 +346,11 @@ class PushService {
           if (payload == null || payload.isEmpty) return;
           try {
             final data = jsonDecode(payload) as Map<String, dynamic>;
+
+            if (data['type'] == 'app_update') {
+              _announceAppUpdate();
+              return;
+            }
 
             // An appointment drawn by us, which only happens in the
             // foreground. Routed rather than dismissed: there is no call to
@@ -323,6 +402,18 @@ class PushService {
             AndroidFlutterLocalNotificationsPlugin
           >()
           ?.createNotificationChannel(_appointmentChannel);
+
+      await _notifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(_accountChannel);
+
+      await _notifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(_updatesChannel);
     } catch (error) {
       AuthLogger.event('PUSH · could not configure', {'reason': '$error'});
     }
@@ -457,6 +548,74 @@ class PushService {
       );
     } catch (error) {
       AuthLogger.event('PUSH · could not show the appointment', {
+        'reason': '$error',
+      });
+    }
+  }
+
+  /// Draws an account notice that arrived with the app in front, where the
+  /// system draws nothing. Tapping it just brings the app forward.
+  static Future<void> _showAccountNotice(Map<String, dynamic> data) async {
+    final title = data['title'] as String? ?? 'Registration update';
+    final body = data['body'] as String? ?? '';
+
+    try {
+      await _notifications.show(
+        id: 'registration'.hashCode,
+        title: title,
+        body: body,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _accountChannel.id,
+            _accountChannel.name,
+            channelDescription: _accountChannel.description,
+            icon: 'ic_stat_notification',
+            color: _brand,
+            importance: Importance.high,
+            priority: Priority.high,
+            autoCancel: true,
+            styleInformation: BigTextStyleInformation(body),
+            ticker: title,
+          ),
+          iOS: const DarwinNotificationDetails(
+            presentAlert: true,
+            presentSound: true,
+          ),
+        ),
+      );
+    } catch (error) {
+      AuthLogger.event('PUSH · could not show the account notice', {
+        'reason': '$error',
+      });
+    }
+  }
+
+  /// The update notification, drawn by us because the app is in front.
+  static Future<void> _showAppUpdate(Map<String, dynamic> data) async {
+    final title = data['title'] as String? ?? 'New version available';
+    final body = data['body'] as String? ?? '';
+
+    try {
+      await _notifications.show(
+        id: 'app-update'.hashCode,
+        title: title,
+        body: body,
+        notificationDetails: NotificationDetails(
+          android: AndroidNotificationDetails(
+            _updatesChannel.id,
+            _updatesChannel.name,
+            channelDescription: _updatesChannel.description,
+            icon: 'ic_stat_notification',
+            color: _brand,
+            autoCancel: true,
+            styleInformation: BigTextStyleInformation(body),
+          ),
+          iOS: const DarwinNotificationDetails(presentAlert: true),
+        ),
+        payload: jsonEncode({'type': 'app_update'}),
+      );
+    } catch (error) {
+      AuthLogger.event('PUSH · could not show the update notice', {
         'reason': '$error',
       });
     }
@@ -598,6 +757,17 @@ class PushService {
     }
   }
 
+  /// This install's build number — the `17` in `1.0.17+17` — or null when it
+  /// cannot be read.
+  static Future<int?> _appBuild() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      return int.tryParse(info.buildNumber);
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// One attempt. True when the server has it.
   Future<bool> _send(String token) async {
     try {
@@ -608,6 +778,8 @@ class PushService {
           'platform': defaultTargetPlatform == TargetPlatform.iOS
               ? 'ios'
               : 'android',
+          // So the "new version" push skips phones already on it.
+          'appBuild': ?await _appBuild(),
         },
       );
 

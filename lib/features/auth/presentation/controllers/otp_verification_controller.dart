@@ -32,21 +32,21 @@ class OtpVerificationController extends ChangeNotifier {
 
   final ResolveStartDestination _resolveStartDestination;
 
-  /// Undoes a sign-in that turned out to belong to the other journey. The
-  /// session is opened by the code being correct, which it was — it is the
-  /// *app* this person asked for that is wrong, and leaving them signed in
-  /// would put them one restart away from the side they were just refused.
+  /// Undoes a sign-in whose account the server no longer recognises. The code
+  /// was correct, so a session is open; leaving it open would put them one
+  /// restart away from an app that cannot load anything.
   final SignOut _signOut;
 
   /// Where this person belongs now they are signed in.
   ///
   /// The same decision the app makes on a cold launch, so a doctor under
-  /// review is never dropped into the patient flow by either path — and a
-  /// number registered under the other role is turned away by both.
+  /// review is never dropped into the patient flow by either path. The role
+  /// they chose decides the side, whether or not the number also holds the
+  /// other one.
   Future<StartEntry> destinationAfterSignIn(UserRole? role) =>
       _resolveStartDestination.forSignedInUser(role: role);
 
-  /// Ends a session that reached the wrong journey. Never throws: the user is
+  /// Ends a session the server refused. Never throws: the user is
   /// going back to the landing screen either way, and a failed sign-out call
   /// still clears the local token.
   Future<void> abandonSession() async {

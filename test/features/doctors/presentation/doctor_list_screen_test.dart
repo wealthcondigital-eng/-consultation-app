@@ -6,6 +6,7 @@ import 'package:consultation_app/features/consultation/domain/entities/consultat
 import 'package:consultation_app/features/doctors/domain/entities/speciality.dart';
 import 'package:consultation_app/features/doctors/presentation/screens/doctor_list_screen.dart';
 import 'package:consultation_app/features/doctors/presentation/widgets/doctor_list_card.dart';
+import 'package:consultation_app/features/home/presentation/widgets/speciality_tile.dart';
 import 'package:consultation_app/features/onboarding/domain/entities/user_role.dart';
 import 'package:consultation_app/features/scheduling/presentation/widgets/schedule_date_strip.dart';
 import 'package:flutter/material.dart';
@@ -275,10 +276,12 @@ void main() {
 
       // Below the last consultation now, so scrolled to first.
       await tester.scrollUntilVisible(
-        find.text('Cardio'),
+        find.byType(SpecialityTile).first,
         200,
         scrollable: find.byType(Scrollable).first,
       );
+      // Past the two pinned tiles and off the right edge of the row.
+      await tester.ensureVisible(find.text('Cardio', skipOffstage: false));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Cardio'));
       await tester.pumpAndSettle();

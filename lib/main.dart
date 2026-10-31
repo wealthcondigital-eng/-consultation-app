@@ -17,6 +17,8 @@ import 'core/push/appointment_push.dart';
 import 'core/push/call_kit_bridge.dart';
 import 'core/push/push_lifecycle.dart';
 import 'core/push/push_service.dart';
+import 'core/recording/recording_upload_queue.dart';
+import 'core/update/app_update_controller.dart';
 import 'features/payment/data/datasources/payment_gateway.dart';
 import 'firebase_options.dart';
 
@@ -89,6 +91,10 @@ Future<void> main() async {
   // server-side, so doing this on every launch costs one row, not one per run.
   if (sl<AuthSession>().isSignedIn) {
     unawaited(sl<PushService>().registerDevice());
+    // Call recordings left unsent by the last run — the app swiped away
+    // mid-upload, or the call ended with no signal. Resumes are covered by
+    // the lifecycle observer below.
+    unawaited(sl<RecordingUploadQueue>().drain());
   }
 
   // And again on every resume, for the launch that had no network yet and for
@@ -117,6 +123,12 @@ Future<void> main() async {
   // app is already waiting by then, and the setter replays it rather than
   // dropping it on the floor.
   PushService.onAppointmentOpened = _openAppointment;
+
+  // A "new version" notification, arriving or tapped: ask Play now, and the
+  // update popup on the home screen comes up — even if Later was tapped on
+  // an earlier offer.
+  PushService.onAppUpdate = () =>
+      unawaited(sl<AppUpdateController>().recheck(force: true));
 
   // Answers from the phone's own ringing screen — the one a doctor sees with
   // the app in the background or killed. Started after the session is

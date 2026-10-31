@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../../../../core/error/failure.dart';
 import '../../../../core/l10n/tr.dart';
+import '../../../../core/logging/auth_logger.dart';
+import '../../../../core/recording/call_recorder.dart';
 import '../../../consultation/domain/entities/consultation_mode.dart';
 import '../../../consultation/domain/usecases/answer_consultations.dart';
 import '../../../doctors/domain/entities/doctor.dart';
@@ -10,7 +12,7 @@ import '../../domain/entities/call_session.dart';
 import '../../domain/repositories/call_repository.dart';
 
 class CallController extends ChangeNotifier {
-  CallController(this._repository, [this._consultations]);
+  CallController(this._repository, [this._consultations, this._newRecorder]);
 
   final CallRepository _repository;
 
@@ -18,6 +20,30 @@ class CallController extends ChangeNotifier {
   /// screen does. Optional because a call can be opened outside the instant
   /// flow — from a chat thread, say — where there is no record to keep.
   final ManageConsultationCall? _consultations;
+
+  /// Makes the recorder for one attempt at the call — a fresh one per
+  /// [initCall], so a Retry records rather than finding the last attempt's
+  /// recorder already stopped. Null where nothing is ever recorded.
+  final CallRecorder Function()? _newRecorder;
+
+  CallRecorder? _recorder;
+
+  /// True when this phone should record: set by [initCall] for the patient's
+  /// side of a consented, non-anonymous consultation.
+  bool _record = false;
+
+  /// The longest the recorder waits, after connecting, for the other side's
+  /// audio to start arriving. The speaker side is captured by attaching to
+  /// WebRTC's playout, which only exists once remote audio is actually
+  /// playing — so recording starts the moment it is, checked against the
+  /// connection's statistics, and this is only the fallback.
+  static const Duration recordingDelay = Duration(seconds: 4);
+
+  /// How often the statistics are read while waiting.
+  static const Duration _audioPoll = Duration(milliseconds: 150);
+
+  /// True while this phone is recording the call.
+  bool get isRecording => _recorder?.isRecording ?? false;
 
   final RTCVideoRenderer localRenderer = RTCVideoRenderer();
   final RTCVideoRenderer remoteRenderer = RTCVideoRenderer();
@@ -62,7 +88,14 @@ class CallController extends ChangeNotifier {
     String? consultationId,
     String peerId = 'self',
     bool isCaller = true,
+    bool record = false,
   }) async {
+    // A Retry's new attempt gets a new recorder; the old one's file, if any,
+    // is already on its way through compose and upload.
+    if (_recorder != null) await _stopRecording(_recorder);
+    _record = record && consultationId != null;
+    _recorder = _record ? _newRecorder?.call() : null;
+
     _session = CallSession(
       channelId: channelId,
       doctor: doctor,
@@ -105,11 +138,17 @@ class CallController extends ChangeNotifier {
             _serverDuration = 0;
             _sinceServerDuration = 0;
             _session = _session?.copyWith(status: state, durationInSeconds: 0);
+            _scheduleRecording();
           } else {
             _session = _session?.copyWith(status: state);
           }
 
           if (state == CallState.connected) _startTimer();
+          // A dropped connection is the end of the recording as well; Retry
+          // starts a new one.
+          if (state == CallState.failed || state == CallState.ended) {
+            unawaited(_stopRecording(_recorder));
+          }
           notifyListeners();
         },
         onRemoteEnded: _onRemoteEnded,
@@ -150,9 +189,69 @@ class CallController extends ChangeNotifier {
     _durationTimer?.cancel();
     _durationTimer = null;
 
-    unawaited(_repository.endCall());
+    // The recorders first: they read from the connection's tracks, which the
+    // teardown closes.
+    unawaited(
+      _stopRecording(_recorder).whenComplete(() => _repository.endCall()),
+    );
 
     _session = _session?.copyWith(status: CallState.ended);
+    notifyListeners();
+  }
+
+  /// Starts the patient's recording as soon as the call is connected and the
+  /// doctor's audio is coming through. See [recordingDelay].
+  void _scheduleRecording() {
+    final recorder = _recorder;
+    final session = _session;
+    final consultationId = session?.consultationId;
+    if (!_record || recorder == null || consultationId == null) return;
+
+    unawaited(() async {
+      final deadline = DateTime.now().add(recordingDelay);
+      while (DateTime.now().isBefore(deadline)) {
+        if (_disposed || _ending || !identical(recorder, _recorder)) return;
+        if (await _repository.remoteAudioFlowing()) break;
+        await Future<void>.delayed(_audioPoll);
+      }
+
+      // The call may have ended, or been retried onto a new recorder, while
+      // this waited.
+      if (_disposed || _ending || !identical(recorder, _recorder)) return;
+      if (state != CallState.connected && state != CallState.reconnecting) {
+        return;
+      }
+
+      try {
+        await recorder.start(
+          consultationId: consultationId,
+          video: session!.mode == ConsultationMode.video,
+          remoteVideoTrack: _repository.remoteVideoTrack,
+        );
+      } catch (error) {
+        // [CallRecorder] swallows its own failures; this is for anything
+        // that slips past. The call carries on either way.
+        AuthLogger.event('RECORDING · not started', {
+          'consultation': consultationId,
+          'reason': error.toString(),
+        });
+      }
+      notifyListeners();
+    }());
+  }
+
+  /// Never throws, and never holds up a hang-up for long: the recorders stop
+  /// in well under a second, and the compose and upload that follow run on
+  /// their own.
+  Future<void> _stopRecording(CallRecorder? recorder) async {
+    if (recorder == null) return;
+    try {
+      await recorder.stop();
+    } catch (error) {
+      AuthLogger.event('RECORDING · not stopped cleanly', {
+        'reason': error.toString(),
+      });
+    }
     notifyListeners();
   }
 
@@ -232,6 +331,8 @@ class CallController extends ChangeNotifier {
 
     final consultationId = _session?.consultationId;
 
+    // Before the teardown, which closes the tracks the recorders read from.
+    await _stopRecording(_recorder);
     await _repository.endCall();
     _session = _session?.copyWith(status: CallState.ended);
     notifyListeners();
@@ -288,6 +389,8 @@ class CallController extends ChangeNotifier {
   /// or Close on a failed call, did exactly that, and the next call — a rejoin
   /// — started on top of it.
   Future<void> _teardown() async {
+    await _stopRecording(_recorder);
+
     try {
       await _repository.endCall();
     } catch (error) {

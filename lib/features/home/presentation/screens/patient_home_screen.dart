@@ -28,6 +28,8 @@ import '../../../doctors/presentation/screens/doctor_list_screen.dart';
 import '../../../profile/presentation/screens/patient_profile_screen.dart';
 import '../controllers/patient_home_controller.dart';
 import '../widgets/active_consultation_banner.dart';
+import '../widgets/consult_consent_dialog.dart';
+import '../../../recordings/presentation/screens/recordings_chat_screen.dart';
 import '../widgets/patient_nav_bar.dart';
 import '../widgets/patient_greeting_header.dart';
 import '../widgets/quick_action_card.dart';
@@ -173,8 +175,14 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
   @override
   Widget build(BuildContext context) {
     // Nothing behind this screen, so the back gesture would close the
-    // app outright — see [ExitConfirmation].
+    // app outright — see [ExitConfirmation]. From another tab, back lands on
+    // the dashboard first; only there does it ask to close.
     return ExitConfirmation(
+      onBack: () {
+        if (_tab == PatientTab.home) return false;
+        _selectTab(PatientTab.home);
+        return true;
+      },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: AppColors.overlayOnCanvas.copyWith(
           statusBarColor: Colors.transparent,
@@ -358,7 +366,19 @@ class _HomeBody extends StatelessWidget {
                 child: Column(
                   children: [
                     QuickActionCard(
-                      title: 'Consult Now',
+                      title: 'Anonymous consultation',
+                      subtitle: 'Talk to a doctor privately',
+                      icon: Icons.person_off_rounded,
+                      accent: AppColors.anonymousAccent,
+                      onTap: () => _openAfterConsent(
+                        context,
+                        ConsultConsent.anonymous,
+                        AppRoutes.anonymousBooking,
+                      ),
+                    ),
+                    SizedBox(height: sizing.spacingSm),
+                    QuickActionCard(
+                      title: 'Video consultation',
                       subtitle: 'Connect instantly with a doctor',
                       icon: Icons.video_call_rounded,
                       accent: AppColors.consultAccent,
@@ -368,19 +388,11 @@ class _HomeBody extends StatelessWidget {
                       // hard-coded doctor in a room called `consult-room-1` —
                       // one room for every patient in the world, and nobody on
                       // the other end of it.
-                      onTap: () => Navigator.of(
+                      onTap: () => _openAfterConsent(
                         context,
-                      ).pushNamed(AppRoutes.consultOptions),
-                    ),
-                    SizedBox(height: sizing.spacingSm),
-                    QuickActionCard(
-                      title: 'Anonymous Consult',
-                      subtitle: 'Talk to a doctor privately',
-                      icon: Icons.person_off_rounded,
-                      accent: AppColors.anonymousAccent,
-                      onTap: () => Navigator.of(
-                        context,
-                      ).pushNamed(AppRoutes.anonymousBooking),
+                        ConsultConsent.video,
+                        AppRoutes.consultOptions,
+                      ),
                     ),
                   ],
                 ),
@@ -422,6 +434,7 @@ class _HomeBody extends StatelessWidget {
                           AppRoutes.consultationReceipt,
                           arguments: last,
                         ),
+                        onOpenChat: () => openRecordingsChat(context, last),
                       ),
                     ],
                   ),
@@ -447,6 +460,22 @@ class _HomeBody extends StatelessWidget {
       },
     );
   }
+}
+
+/// Asks for consent, then opens [route].
+///
+/// Every time, not once: what the patient is agreeing to — recording only
+/// with consent, no prescription when anonymous — is the thing most likely to
+/// be forgotten between one consultation and the next.
+Future<void> _openAfterConsent(
+  BuildContext context,
+  ConsultConsent consent,
+  String route,
+) async {
+  final agreed = await ConsultConsentDialog.show(context, consent);
+
+  if (!agreed || !context.mounted) return;
+  await Navigator.of(context).pushNamed(route);
 }
 
 /// Opens the doctor listing, scoped to [speciality] or to every doctor.
@@ -514,8 +543,13 @@ void _openDoctor(BuildContext context, Appointment appointment) {
 
 /// The specialities doctors register under, in the names the directory
 /// filters on exactly. Matches the onboarding list.
+///
+/// The first two are pinned to the front of the row, ahead of the patient's
+/// own history — they are the two the service leads with.
+const _pinnedSpecialities = ['Stress Management', 'Internal Medicine'];
+
 const _catalogueSpecialities = [
-  'Internal Medicine',
+  ..._pinnedSpecialities,
   'Dermatology',
   'Paediatrics',
   'Cardiology',
@@ -526,9 +560,12 @@ const _catalogueSpecialities = [
 /// The patient's own specialities first, commonest first, then the rest of
 /// the catalogue — so the row is never a single lonely tile.
 List<Speciality> _browseSpecialities(List<Speciality> own) {
-  final seen = {for (final speciality in own) speciality.id.toLowerCase()};
+  final seen = <String>{};
   return [
-    ...own,
+    for (final name in _pinnedSpecialities)
+      if (seen.add(name.toLowerCase())) Speciality.named(name),
+    for (final speciality in own)
+      if (seen.add(speciality.id.toLowerCase())) speciality,
     for (final name in _catalogueSpecialities)
       if (seen.add(name.toLowerCase())) Speciality.named(name),
   ];
@@ -546,8 +583,10 @@ class _SpecialityRow extends StatelessWidget {
 
     // Scrolls sideways, bleeding past the screen padding so the last tile is
     // visibly cut — the cue that there is more.
+    // Tall enough for a two-line name: "Stress Management" and "Internal
+    // Medicine" were cut to "Internal M…" on one line.
     return SizedBox(
-      height: sizing.r(104),
+      height: sizing.r(132),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         clipBehavior: Clip.none,

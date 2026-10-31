@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../../features/recordings/data/recordings_remote_data_source.dart';
 import '../../features/admin/data/datasources/admin_remote_data_source.dart';
 import '../../features/admin/data/datasources/api_admin_remote_data_source.dart';
 import '../../features/admin/data/repositories/admin_repository_impl.dart';
@@ -18,12 +19,6 @@ import '../../features/anonymous/domain/usecases/suggest_code_name.dart';
 import '../../features/anonymous/presentation/controllers/anonymous_booking_controller.dart';
 import '../../features/auth/data/datasources/auth_remote_data_source.dart';
 import '../../features/auth/data/datasources/otp_auth_remote_data_source.dart';
-import '../../features/chat/data/datasources/chat_remote_data_source.dart';
-import '../../features/chat/data/repositories/chat_repository_impl.dart';
-import '../../features/chat/domain/repositories/chat_repository.dart';
-import '../../features/chat/domain/usecases/open_chat_thread.dart';
-import '../../features/chat/domain/usecases/send_chat_message.dart';
-import '../../features/chat/presentation/controllers/chat_controller.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/domain/usecases/request_otp.dart';
@@ -31,6 +26,9 @@ import '../../features/auth/domain/usecases/sign_out.dart';
 import '../../features/auth/domain/usecases/verify_otp.dart';
 import '../../features/auth/presentation/controllers/otp_verification_controller.dart';
 import '../../features/auth/presentation/controllers/phone_login_controller.dart';
+import '../recording/call_recorder.dart';
+import '../recording/recording_composer.dart';
+import '../recording/recording_upload_queue.dart';
 import '../../features/call/data/datasources/call_signalling_client.dart';
 import '../../features/call/data/datasources/webrtc_media_service.dart';
 import '../../features/call/data/repositories/call_repository_impl.dart';
@@ -249,7 +247,15 @@ void configureDependencies({AppBackend backend = AppBackend.fake}) {
     ..registerLazySingleton<LanguageController>(LanguageController.new)
     // Google Play in-app updates. One instance, so the banner on either home
     // screen shows the same download.
-    ..registerLazySingleton<AppUpdateController>(AppUpdateController.new)
+    ..registerLazySingleton<AppUpdateController>(
+      () => AppUpdateController(
+        // Version name and "What's new" for the popup. Unauthenticated, so
+        // it works before a session is restored.
+        latestRelease: () async => sl.isRegistered<ApiClient>()
+            ? await sl<ApiClient>().get('/app/latest', signalsExpiry: false)
+            : null,
+      ),
+    )
     // Registered against the signed-in user, so it is created lazily and used
     // from the OTP screen once there is a user to file it against.
     ..registerLazySingleton<PushService>(() => PushService(sl<ApiClient>()))
@@ -299,10 +305,9 @@ void configureDependencies({AppBackend backend = AppBackend.fake}) {
         sl<VerifyOtp>(),
         sl<RequestOtp>(),
         sl<ResolveStartDestination>(),
-        // Undoes a sign-in that reached the wrong journey — a number already
-        // registered under the other role. The code was right, so a session is
-        // open; leaving it open would put them one restart away from the app
-        // they were just turned away from.
+        // Undoes a sign-in whose account the server refused. The code was
+        // right, so a session is open; leaving it open would put them one
+        // restart away from an app that cannot load.
         sl<SignOut>(),
       ),
     )
@@ -411,6 +416,7 @@ void configureDependencies({AppBackend backend = AppBackend.fake}) {
         sl<DoctorOnboardingRepository>(),
         sl<IsAdmin>(),
         sl<GetSelectedRole>(),
+        sl<SelectRole>(),
       ),
     )
     // --- Home: data ---------------------------------------------------------
@@ -554,21 +560,13 @@ void configureDependencies({AppBackend backend = AppBackend.fake}) {
     ..registerFactory<AnonymousBookingController>(
       AnonymousBookingController.new,
     )
-    // --- Chat: data ---------------------------------------------------------
-    ..registerLazySingleton<ChatRemoteDataSource>(FakeChatRemoteDataSource.new)
-    ..registerLazySingleton<ChatRepository>(
-      () => ChatRepositoryImpl(sl<ChatRemoteDataSource>()),
-    )
-    // --- Chat: domain -------------------------------------------------------
-    ..registerLazySingleton<OpenChatThread>(
-      () => OpenChatThread(sl<ChatRepository>()),
-    )
-    ..registerLazySingleton<SendChatMessage>(
-      () => SendChatMessage(sl<ChatRepository>()),
-    )
-    // --- Chat: presentation -------------------------------------------------
-    ..registerFactory<ChatController>(
-      () => ChatController(sl<OpenChatThread>(), sl<SendChatMessage>()),
+    // --- Call recordings: data ----------------------------------------------
+    // What the profile's "Call recordings" and the recordings chat list.
+    ..registerLazySingleton<RecordingsRemoteDataSource>(
+      () => switch (backend) {
+        AppBackend.fake => const FakeRecordingsRemoteDataSource(),
+        AppBackend.live => ApiRecordingsRemoteDataSource(sl<ApiClient>()),
+      },
     )
     // --- Doctor onboarding: data --------------------------------------------
     ..registerLazySingleton<CertificatePicker>(
@@ -750,7 +748,10 @@ void configureDependencies({AppBackend backend = AppBackend.fake}) {
     ..registerLazySingleton<NotificationRemoteDataSource>(
       () => switch (backend) {
         AppBackend.fake => InMemoryNotificationRemoteDataSource(),
-        AppBackend.live => ApiNotificationRemoteDataSource(sl<ApiClient>()),
+        AppBackend.live => ApiNotificationRemoteDataSource(
+          sl<ApiClient>(),
+          sl<RoleRepository>(),
+        ),
       },
     )
     ..registerLazySingleton<NotificationRepository>(
@@ -890,6 +891,22 @@ void configureDependencies({AppBackend backend = AppBackend.fake}) {
         // opened from outside the instant flow carries no consultation id, in
         // which case this is never reached.
         sl<ManageConsultationCall>(),
+        // Only ever used on the patient's phone, for a consented,
+        // non-anonymous consultation — see `CallArgs.recordsHere`.
+        () => sl<CallRecorder>(),
       ),
+    )
+    // --- Call recording -----------------------------------------------------
+    // The composer is stateless; the queue is one instance so there is one
+    // drain at a time and one pending count to show; a recorder is one call.
+    ..registerLazySingleton<RecordingComposer>(RecordingComposer.new)
+    ..registerLazySingleton<RecordingUploadQueue>(
+      () => RecordingUploadQueue(
+        sl<ApiClient>(),
+        canUpload: () => sl<AuthSession>().isSignedIn,
+      ),
+    )
+    ..registerFactory<CallRecorder>(
+      () => CallRecorder(sl<RecordingComposer>(), sl<RecordingUploadQueue>()),
     );
 }

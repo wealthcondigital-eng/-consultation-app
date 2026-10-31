@@ -140,7 +140,7 @@ class _Session {
     final userId = json['userId'];
     final phone = json['phone'];
     final token = json['token'];
-    final expiresAt = DateTime.tryParse(json['expiresAt'] as String? ?? '');
+    final expiresAt = DateTime.tryParse(json['expiresAt'] as String? ?? '')?.toLocal();
 
     if (userId is! String || phone is! String || token is! String) return null;
     if (expiresAt == null) return null;

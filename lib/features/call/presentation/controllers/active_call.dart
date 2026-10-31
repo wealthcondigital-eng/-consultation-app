@@ -144,7 +144,9 @@ class ActiveCall extends ChangeNotifier {
   /// refused permission, or Close on a failed call.
   void discardIfNotStarted(CallController controller) {
     if (!identical(controller, _controller)) return;
-    if (isActive && controller.session != null && controller.state != CallState.initializing) {
+    if (isActive &&
+        controller.session != null &&
+        controller.state != CallState.initializing) {
       return;
     }
     _controller = null;

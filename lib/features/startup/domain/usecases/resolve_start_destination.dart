@@ -6,6 +6,7 @@ import '../../../doctor_onboarding/domain/entities/doctor_application.dart';
 import '../../../doctor_onboarding/domain/entities/practice_setup.dart';
 import '../../../onboarding/domain/entities/user_role.dart';
 import '../../../onboarding/domain/usecases/get_selected_role.dart';
+import '../../../onboarding/domain/usecases/select_role.dart';
 import '../../../doctor_onboarding/domain/repositories/doctor_onboarding_repository.dart';
 import '../../../profile/domain/repositories/profile_repository.dart';
 import '../entities/start_destination.dart';
@@ -20,16 +21,16 @@ import '../entities/start_destination.dart';
 /// of them into patient onboarding, which is exactly the bug this exists to
 /// prevent.
 ///
-/// **A number belongs to one journey.** Beyond routing, this is the gate that
-/// keeps the two apps apart. A phone number registered as a doctor cannot be
-/// used to enter the patient app and vice versa: the mismatch ends the session
-/// and returns to the landing screen with an explanation, rather than quietly
-/// starting a second account on the same identity. Two consequences worth
-/// stating, because both were live bugs:
+/// **One number, two profiles.** A doctor can also be a patient, so one account
+/// may hold both a patient record and a doctor application. Neither excludes
+/// the other: the journey the person chose — on the landing screen, or with
+/// the switch on either profile screen — decides which side opens.
 ///
-///  * A patient tapping **Doctor** on the landing screen no longer lands in
-///    doctor registration, so the doctor app cannot be reached by choosing it.
-///  * A doctor is never handed the patient dashboard, whatever they tapped.
+///  * **Patient**: the dashboard if there is a patient record, else the
+///    patient details form — whatever the doctor side holds.
+///  * **Doctor**: wherever the application has got to, or the certificate form
+///    if there is none — whatever the patient side holds.
+///  * **No stored choice**: see [_likelyJourney].
 ///
 /// And the doctor app itself is gated on the *review*, not on the tap: the only
 /// route to [StartDestination.doctorHome] is an approved application, which
@@ -55,6 +56,7 @@ class ResolveStartDestination {
     this._doctorRepository,
     this._isAdmin,
     this._getSelectedRole,
+    this._selectRole,
   );
 
   final AuthRepository _authRepository;
@@ -64,6 +66,12 @@ class ResolveStartDestination {
 
   /// The journey this person chose, kept across launches.
   final GetSelectedRole _getSelectedRole;
+
+  /// Written back when the answer opens a different journey from the one
+  /// asked for — no stored choice, or an abandoned registration falling back to
+  /// the other side — so the next launch, and anything that reads the role
+  /// (the notification bell), agrees with the screen that actually opened.
+  final SelectRole _selectRole;
 
   /// Cold launch: no session means the landing screen.
   ///
@@ -76,33 +84,7 @@ class ResolveStartDestination {
       return const StartEntry(StartDestination.landing);
     }
 
-    return _abandonedIfUnfinished(
-      await forSignedInUser(role: await _storedRole()),
-    );
-  }
-
-  /// Turns "resume the registration form" into "start over", on a cold launch
-  /// only.
-  ///
-  /// The two destinations below are the ones reached with a verified phone
-  /// number and nothing else stored against it — the patient details form and
-  /// the certificate form on a first registration. Straight after OTP they are
-  /// exactly right, which is why this wraps [call] and not [forSignedInUser]:
-  /// the same answer means "carry on" in one context and "you left this
-  /// half-done" in the other, and only the caller knows which.
-  ///
-  /// A doctor correcting a *rejected* application is deliberately not included.
-  /// The destination is the same form, but there is a filed registration behind
-  /// it and an account to go with it — that is work to resume, not work that
-  /// was abandoned.
-  StartEntry _abandonedIfUnfinished(StartEntry entry) {
-    final unfinished = switch (entry.destination) {
-      StartDestination.completeProfile => true,
-      StartDestination.doctorSetup => entry.application == null,
-      _ => false,
-    };
-
-    return unfinished ? StartEntry.abandonedRegistration() : entry;
+    return _resolve(await _storedRole(), coldLaunch: true);
   }
 
   Future<UserRole?> _storedRole() async {
@@ -114,19 +96,27 @@ class ResolveStartDestination {
     }
   }
 
-  /// Straight after OTP, where being signed in is a given.
+  /// Straight after OTP, or after switching profiles, where being signed in is
+  /// a given.
   ///
-  /// [role] is what the person picked on the landing screen. It decides where a
-  /// brand-new account with no records belongs — and, now, whether this account
-  /// may be entered from this journey at all.
-  Future<StartEntry> forSignedInUser({UserRole? role}) async {
-    final entry = await _resolveFor(role);
+  /// [role] is the journey picked — on the landing screen, or on a profile
+  /// screen's switch. It decides which side opens, and where a side with no
+  /// record yet begins.
+  Future<StartEntry> forSignedInUser({UserRole? role}) =>
+      _resolve(role, coldLaunch: false);
+
+  Future<StartEntry> _resolve(
+    UserRole? role, {
+    required bool coldLaunch,
+  }) async {
+    final entry = await _resolveFor(role, coldLaunch: coldLaunch);
 
     // Until this line the only trace of the decision was the screen the user
     // ended up on — no help at all when that screen is the one they started
     // from, which is what all three of the turn-back answers look like.
     AuthLogger.event('STARTUP · destination', {
       'chose role': role?.name ?? '(none)',
+      'cold launch': coldLaunch,
       'destination': entry.destination.name,
       'notice': entry.notice ?? '(none)',
     });
@@ -134,7 +124,10 @@ class ResolveStartDestination {
     return entry;
   }
 
-  Future<StartEntry> _resolveFor(UserRole? role) async {
+  Future<StartEntry> _resolveFor(
+    UserRole? role, {
+    required bool coldLaunch,
+  }) async {
     if (await _isAdmin()) {
       return const StartEntry(StartDestination.adminQueue);
     }
@@ -148,22 +141,67 @@ class ResolveStartDestination {
     // one of the two apps.
     if (doctor.expired) return StartEntry.expiredSession(doctor.message);
 
-    if (doctor.application case final application?) {
-      // A registered doctor asking to come in as a patient. Refused rather than
-      // silently routed to their own dashboard: a patient who taps Patient and
-      // arrives in the doctor app has been told nothing about why, and this is
-      // the first of the two directions that made the apps reachable from each
-      // other.
-      if (role == UserRole.patient) {
-        return StartEntry.conflict(registeredAs: 'doctor');
-      }
+    final patient = await _patientProfile();
 
+    if (patient.expired) return StartEntry.expiredSession(patient.message);
+
+    final journey = role ?? _likelyJourney(doctor, patient);
+    if (journey != null && journey != role) await _remember(journey);
+
+    return switch (journey) {
+      UserRole.doctor => _asDoctor(doctor, patient, coldLaunch: coldLaunch),
+      UserRole.patient => _asPatient(doctor, patient, coldLaunch: coldLaunch),
+      // A restored session with no records of any kind: let them choose again
+      // rather than guessing which app they meant to be in.
+      null => const StartEntry(StartDestination.landing),
+    };
+  }
+
+  /// Which side to open when nobody said — a session restored with no stored
+  /// choice, or an OTP with no role attached.
+  ///
+  /// With a record on one side only, that side. With both, the doctor side only
+  /// when it is a working practice (approved): a doctor still under review or
+  /// correcting a rejection has a status screen, while the patient side is a
+  /// whole app they can use today, and the profile switch is one tap away.
+  /// A patient lookup that failed counts as "not known to exist", so an
+  /// application is not passed over on a guess. Null when there is nothing on
+  /// either side.
+  static UserRole? _likelyJourney(
+    _DoctorLookup doctor,
+    _PatientLookup patient,
+  ) {
+    final application = doctor.application;
+    final hasPatient = patient.exists && !patient.failed;
+
+    if (application != null) {
+      final approved = application.status == DoctorApplicationStatus.approved;
+      return approved || !hasPatient ? UserRole.doctor : UserRole.patient;
+    }
+
+    return patient.exists ? UserRole.patient : null;
+  }
+
+  Future<void> _remember(UserRole role) async {
+    try {
+      await _selectRole(role);
+    } catch (_) {
+      // Routing still works on this launch; the next one simply decides again.
+    }
+  }
+
+  Future<StartEntry> _asDoctor(
+    _DoctorLookup doctor,
+    _PatientLookup patient, {
+    required bool coldLaunch,
+  }) async {
+    if (doctor.application case final application?) {
       return _forApplication(application);
     }
 
-    // The doctor lookup failed rather than answering "no application", so
-    // nothing below can be trusted to mean what it says.
-    if (doctor.failed && role == UserRole.doctor) {
+    // The doctor lookup failed rather than answering "no application", so the
+    // certificate form cannot be trusted to be the right screen.
+    if (doctor.failed) {
       // The role choice, not the certificate form. That form was the old
       // fallback because it re-reads the application and moves a doctor on —
       // but its first screen asks for a medical certificate, so a registered
@@ -172,43 +210,45 @@ class ResolveStartDestination {
       // a tap rather than a re-verification.
       return StartEntry.unconfirmed();
     }
-    // A patient is unaffected by a doctor lookup failing: their own record
-    // below is the authority on where they go.
 
-    final patient = await _patientProfile();
+    // No application: a new doctor, who starts at the certificate because
+    // that is where registration begins — a patient record or not.
+    if (!coldLaunch) return const StartEntry(StartDestination.doctorSetup);
 
-    if (patient.expired) return StartEntry.expiredSession(patient.message);
-
-    if (role == UserRole.doctor) {
-      // The other direction: a registered patient asking to come in as a
-      // doctor. Refused for the same reason, and only when the lookup actually
-      // answered — a failed read must not lock a real doctor out of their own
-      // registration.
-      if (patient.exists && !patient.failed) {
-        return StartEntry.conflict(registeredAs: 'patient');
-      }
-
-      // Could not confirm they are not already a patient. The certificate form
-      // is only the right screen for someone with no records at all, and this
-      // is not knowably that person.
-      if (patient.failed) return StartEntry.unconfirmed();
-
-      // No records of any kind: a genuinely new doctor, who starts at the
-      // certificate because that is where registration begins.
-      return const StartEntry(StartDestination.doctorSetup);
+    // A cold launch onto the certificate form means it was left half-done.
+    // Someone with a patient side has an account to go back to, so they get it
+    // rather than being signed out; the switch on their profile leads here
+    // again whenever they want it.
+    if (patient.failed) return StartEntry.unconfirmed();
+    if (patient.exists) {
+      await _remember(UserRole.patient);
+      return const StartEntry(StartDestination.home);
     }
 
+    return StartEntry.abandonedRegistration();
+  }
+
+  Future<StartEntry> _asPatient(
+    _DoctorLookup doctor,
+    _PatientLookup patient, {
+    required bool coldLaunch,
+  }) async {
     // The patient dashboard carries its own retry, so a failed read is
     // survivable there in a way the certificate form never was — and the
     // session is already known to be good, because a 401 was handled above.
     if (patient.exists) return const StartEntry(StartDestination.home);
 
-    return switch (role) {
-      UserRole.patient => const StartEntry(StartDestination.completeProfile),
-      // A restored session with no records of any kind: let them choose again
-      // rather than guessing which app they meant to be in.
-      UserRole.doctor || null => const StartEntry(StartDestination.landing),
-    };
+    if (!coldLaunch) return const StartEntry(StartDestination.completeProfile);
+
+    // A cold launch onto the patient details form: the same half-done
+    // registration, with the same way out for a doctor who has one.
+    if (doctor.application case final application?) {
+      await _remember(UserRole.doctor);
+      return _forApplication(application);
+    }
+    if (doctor.failed) return StartEntry.unconfirmed();
+
+    return StartEntry.abandonedRegistration();
   }
 
   Future<StartEntry> _forApplication(DoctorApplication application) async {
@@ -297,8 +337,8 @@ class ResolveStartDestination {
     }
   }
 
-  /// What the server actually said, for the one case where the app turns the
-  /// user back at the door. A failed lookup is swallowed on purpose — it must
+  /// What the server actually said, for the cases where the app turns the user
+  /// back at the door. A failed lookup is swallowed on purpose — it must
   /// not strand anyone on an error screen — but swallowing it silently is what
   /// made "it just returns me to the start" impossible to explain.
   static void _logLookupFailure(String lookup, Object error) {
@@ -318,8 +358,9 @@ class ResolveStartDestination {
   ///
   /// It used to be a plain bool that returned true on failure, so the app could
   /// not tell "this is a patient" from "the network is down" — harmless while
-  /// the only consequence was which dashboard opened, and not harmless now that
-  /// the same answer decides whether a doctor is turned away.
+  /// the only consequence was which dashboard opened, and not harmless once the
+  /// same answer decides which side opens when nobody chose, and whether an
+  /// abandoned registration has another side to fall back to.
   Future<_PatientLookup> _patientProfile() async {
     try {
       return _PatientLookup(exists: await _profileRepository.hasProfile());

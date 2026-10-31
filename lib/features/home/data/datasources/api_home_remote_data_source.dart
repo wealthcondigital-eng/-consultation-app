@@ -159,10 +159,10 @@ class ApiHomeRemoteDataSource implements HomeRemoteDataSource {
           : ConsultationMode.video,
       status: AppointmentStatus.from(json['status'] as String?),
       requestedAt:
-          DateTime.tryParse(json['requestedAt'] as String? ?? '') ??
+          DateTime.tryParse(json['requestedAt'] as String? ?? '')?.toLocal() ??
           DateTime.now(),
-      startedAt: DateTime.tryParse(json['startedAt'] as String? ?? ''),
-      endedAt: DateTime.tryParse(json['endedAt'] as String? ?? ''),
+      startedAt: DateTime.tryParse(json['startedAt'] as String? ?? '')?.toLocal(),
+      endedAt: DateTime.tryParse(json['endedAt'] as String? ?? '')?.toLocal(),
       durationSeconds: (json['durationSeconds'] as num?)?.toInt() ?? 0,
       fee: (json['fee'] as num?)?.toInt(),
       rating: (json['rating'] as num?)?.toInt(),
@@ -199,7 +199,7 @@ class ApiHomeRemoteDataSource implements HomeRemoteDataSource {
       allergies: _stringsOf(value['allergies']),
       surgeries: _stringsOf(value['surgeries']),
       notes: value['notes'] as String?,
-      lastUpdated: updatedAt == null ? null : DateTime.tryParse(updatedAt),
+      lastUpdated: updatedAt == null ? null : DateTime.tryParse(updatedAt)?.toLocal(),
     );
   }
 
@@ -246,6 +246,7 @@ class ApiHomeRemoteDataSource implements HomeRemoteDataSource {
                 ?.toInt(),
             isVerified: row['isVerified'] == true,
             isAvailableNow: row['isAvailableNow'] == true,
+            photoUrl: row['photoUrl'] as String?,
           ),
     ];
   }
@@ -287,7 +288,7 @@ class ApiHomeRemoteDataSource implements HomeRemoteDataSource {
               row['kind'],
               scheduledAt: DateTime.tryParse(
                 row['scheduledAt'] as String? ?? '',
-              ),
+              )?.toLocal(),
             ),
             concern: switch (row['concern']) {
               final String text when text.trim().isNotEmpty => text.trim(),

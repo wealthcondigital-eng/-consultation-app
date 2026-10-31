@@ -55,7 +55,7 @@ class ApiAdminRemoteDataSource implements AdminRemoteDataSource {
     return DoctorReview(
       doctorId: json['doctorId'] as String? ?? json['id'] as String? ?? '',
       fullName: json['fullName'] as String? ?? 'Unnamed applicant',
-      submittedAt: submittedAt == null ? null : DateTime.tryParse(submittedAt),
+      submittedAt: submittedAt == null ? null : DateTime.tryParse(submittedAt)?.toLocal(),
       medicalDegree: json['medicalDegree'] as String?,
       registrationNumber: json['registrationNumber'] as String?,
       specialty: json['specialty'] as String?,

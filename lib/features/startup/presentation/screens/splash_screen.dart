@@ -138,8 +138,8 @@ class _SplashScreenState extends State<SplashScreen>
 
     // The two outcomes that end the session and return to the role choice.
     //
-    //  * roleConflict — the number was registered under the other journey
-    //    since, so the stored role no longer matches the account.
+    //  * registrationAbandoned — a registration form left half-done, with no
+    //    usable profile on the other side to fall back to.
     //  * sessionExpired — the server refused the token outright. The account
     //    behind it is gone, and no local check could have caught that: the
     //    token is unexpired and well-formed, which is exactly why this used to
@@ -148,7 +148,6 @@ class _SplashScreenState extends State<SplashScreen>
     // Ended here rather than carried into either app, so the next launch asks
     // the question again from a clean start.
     final endsSession =
-        entry.destination == StartDestination.roleConflict ||
         entry.destination == StartDestination.sessionExpired ||
         entry.destination == StartDestination.registrationAbandoned;
 
@@ -156,8 +155,8 @@ class _SplashScreenState extends State<SplashScreen>
       await sl<SignOut>()().catchError((Object _) {});
       if (!mounted) return;
 
-      // A role conflict and an unfinished registration are this screen's own
-      // findings, so they always speak. An expired session is a 401 the
+      // An unfinished registration is this screen's own finding, so it always
+      // speaks. An expired session is a 401 the
       // app-wide gate can have seen first, so that message is claimed rather
       // than said twice.
       final shouldExplain =
@@ -197,7 +196,6 @@ class _SplashScreenState extends State<SplashScreen>
         // Unreachable — both handled above — but the switch must stay
         // exhaustive so adding a destination is a compile error rather than a
         // silent fall-through to the wrong app.
-        StartDestination.roleConflict ||
         StartDestination.sessionExpired ||
         StartDestination.registrationAbandoned => AppRoutes.landing,
         StartDestination.completeProfile => AppRoutes.completeProfile,

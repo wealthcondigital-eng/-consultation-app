@@ -30,6 +30,7 @@ const _completeCredentials = DoctorCredentials(
   state: 'New York',
   city: 'New York',
   yearsOfExperience: 8,
+  languages: ['English', 'Hindi'],
 );
 
 const _completeBank = BankAccount(
@@ -455,7 +456,9 @@ void main() {
 
       expect(credentials.fullName, 'Dr. Sarah Jenkins');
       expect(credentials.registrationNumber, 'REG-9920-A');
-      expect(credentials.isComplete, isTrue);
+      // Everything but languages, which no certificate says and the doctor
+      // always picks themselves.
+      expect(credentials.missingFields, [DoctorCredentialField.languages]);
       expect(
         credentials.isVerified(DoctorCredentialField.registrationNumber),
         isTrue,
