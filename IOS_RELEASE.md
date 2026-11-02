@@ -100,8 +100,9 @@ profiles itself.
    `consult.nesliferesearch.ios` → **APNs Authentication Key** → Upload the
    `.p8` with its Key ID and Team ID.
 4. Same settings page, **General** tab → the iOS app `consult.nesliferesearch.ios`:
-   add the Team ID, and later the App Store ID. Its App ID must be the `ios`
-   entry in `lib/firebase_options.dart`. The older iOS app registered for
+   add the Team ID, and later the App Store ID. Its App ID is
+   `1:505105017093:ios:8441b8a7eb9347f3482f6c`, the `ios` entry in
+   `lib/firebase_options.dart`. The older iOS app registered for
    `consult.nesliferesearch.com` (`…:ios:09c529cb1a44be94482f6c`) is unused and
    can be deleted.
 
