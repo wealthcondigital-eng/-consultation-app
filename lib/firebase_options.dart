@@ -57,12 +57,15 @@ class DefaultFirebaseOptions {
     storageBucket: 'online-consultation-37554.firebasestorage.app',
   );
 
+  // TODO(ios): appId is still the Firebase iOS app registered for the old
+  // bundle id. Register `consult.nesliferesearch.ios` in Firebase and put its
+  // App ID here, or iPhones get no push.
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyBvUuKvJ2otIrLYyslHOswykl_WT6mM4GE',
     appId: '1:505105017093:ios:09c529cb1a44be94482f6c',
     messagingSenderId: '505105017093',
     projectId: 'online-consultation-37554',
     storageBucket: 'online-consultation-37554.firebasestorage.app',
-    iosBundleId: 'consult.nesliferesearch.com',
+    iosBundleId: 'consult.nesliferesearch.ios',
   );
 }

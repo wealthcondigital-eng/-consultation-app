@@ -11,10 +11,41 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<!-- Purpose strings. App Review reads these, and a vague one is a common
+	     rejection (5.1.1), so each names what the access is for. -->
 	<key>NSCameraUsageDescription</key>
-	<string>Teleconsult requires camera access to conduct video calls with doctors.</string>
+	<string>Teleconsult uses the camera for video consultations with your doctor, and to photograph a profile picture, a medical report or a registration certificate when you choose to.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Teleconsult requires microphone access for audio and video calls.</string>
+	<string>Teleconsult uses the microphone so you can speak with your doctor during audio and video consultations.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Teleconsult lets you choose a profile picture or a medical report from your photos to share with your doctor.</string>
+	<!-- Live calls keep their audio when the screen locks or another app comes
+	     forward (audio), and the call-ended push can take a stale ring down
+	     (remote-notification). -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>remote-notification</string>
+	</array>
+	<!-- HTTPS, and DTLS-SRTP inside WebRTC, are exempt standard encryption.
+	     Answers the export-compliance question so every upload does not stop
+	     to ask it. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<!-- UPI apps Razorpay's checkout may hand the payment to. iOS only lets an
+	     app see whether one is installed if its scheme is listed here, so a
+	     missing one simply does not appear as a payment option. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tez</string>
+		<string>phonepe</string>
+		<string>paytmmp</string>
+		<string>credpay</string>
+		<string>bhim</string>
+		<string>mobikwik</string>
+		<string>amazonpay</string>
+		<string>upi</string>
+	</array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
@@ -69,13 +100,6 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
-	<key>UISupportedInterfaceOrientations~ipad</key>
-	<array>
-		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>

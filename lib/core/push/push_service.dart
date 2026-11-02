@@ -9,6 +9,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../features/notifications/domain/entities/app_notification.dart';
+import '../../firebase_options.dart';
 import '../logging/auth_logger.dart';
 import '../network/api_client.dart';
 import '../session/session_store.dart';
@@ -48,13 +49,15 @@ Future<void> handleBackgroundMessage(RemoteMessage message) async {
   if (!await hasStoredSession()) return;
 
   // A fresh isolate, so Firebase and the notification plugin are both
-  // uninitialised here even though `main` set them up minutes ago.
-  await Firebase.initializeApp();
+  // uninitialised here even though `main` set them up minutes ago. Options
+  // passed explicitly: iOS has no GoogleService-Info.plist to fall back on.
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   // Android gets the phone's own incoming-call screen: full screen over the
   // lock screen, ringing until answered, with Accept and Decline on it. iOS
   // cannot be woken to draw one by an ordinary push — that needs PushKit — so
-  // it keeps the notification until then.
+  // the server sends it there as an alert the system draws, which returns at
+  // the top of this function. This line is only reached if that changes.
   if (defaultTargetPlatform == TargetPlatform.android) {
     // In this process, before the call is up: a Decline tapped while the app
     // is killed is delivered to Dart only if a handler was registered here.
@@ -687,6 +690,17 @@ class PushService {
               'registering anyway — the token is still valid and delivery '
               'starts the moment notifications are turned on',
         });
+      }
+
+      // iOS issues an FCM token only once APNs has given the phone its own
+      // address, which lands a moment after permission is granted — and
+      // `getToken` before then throws rather than waiting. Five seconds covers
+      // a normal launch; a phone still without one is retried on resume.
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        for (var i = 0; i < 10; i++) {
+          if (await messaging.getAPNSToken() != null) break;
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+        }
       }
 
       final token = await messaging.getToken();
